@@ -1,5 +1,5 @@
 from   func_system     import *
-from   masses       import *
+from   func_masses     import *
 from   func_partition  import *
 from   func_atmosphere import *
 from   func_plot       import *
@@ -18,7 +18,6 @@ rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text',usetex=True)
 rc('text.latex', preamble=r'\usepackage{sfmath}')
 
-#from   growth import *
 
 """
 This file models the redox evolution during planet growth.
@@ -29,7 +28,7 @@ The magma ocean covers the "metal pond" before the next impactor arrives.
 rpl     = 1000e3   # initial embryo size (radius in m)
 f_core  = 0.08      # fraction of core mass
 
-melt_factor = 100  # melt volume produced upon impact = melt_factor * vol_impactor
+melt_factor = 20  # melt volume produced upon impact = melt_factor * vol_impactor
 
 ''' composition '''
 # set initial composition in wt% 
@@ -66,7 +65,6 @@ l_sil, l_met = n_mantle, n_core
 l_Mm,  l_Mc  = M_mantle, M_core
 
 
-
 # solve for growth:
 # -- growing the planetesimal to a planetary embryo
 count = 0
@@ -89,7 +87,7 @@ while (1):
     # calculate delivered amounts of material
     r_impactor = rpl / 5
     c_impactor = core_radius(r_impactor, f_core)
-    
+
     # the core of the delivered planetesimal
     M_core_delivered = shell_mass(rhoc, c_impactor, c_impactor)
     n_core_delivered = M_core_delivered * mole_core_unit
@@ -100,20 +98,22 @@ while (1):
 
     # the total of the delivered material
     M_delivered = M_mantle_delivered + M_core_delivered
-    n_delivered = n_mantle_delivered + n_core_delivered
-    
+    n_delivered = n_mantle_delivered + n_core_delivered    
 
     # update the mass of the planet &
     # calc gravitational acceleration
     Mpl   = M_mantle + M_core + M_delivered    
     g_acc = calculate_g(Mpl)
 
-    
     ''' magma ocean '''
     # calculate the depth h of the magma ocean formed
+    # ... (melt_factor)*(volume of impactor) is assumed to become molten after the impact
+    #     this implicitly assumes that magma ocean solidifies each time the impact happens
     h = calculate_h(melt_factor * 4./3*(r_impactor)**3, rpl)
 
     # h_frac is the fraction of the mantle that is molten (magma ocean)
+    # this value is probably small considering the rapid solidification,
+    # but previous studies have assumed a large number (maybe try 0.5-1.?)
     h_frac = shell_mass(rhom, rpl, h) / shell_mass(rhom, rpl, rpl-rc)
     
 
@@ -170,7 +170,7 @@ while (1):
     # recalculate core and mantle masses
     M_mantle = mole2mass(n_mantle)
     M_core   = mole2mass(n_core)
-
+    
     # increase planet size
     rc       = mass2radius(M_core, rhoc)
     d_mantle = mass2shell_width(M_mantle, rhom, rc)
@@ -203,20 +203,20 @@ ax[0].semilogy(l_rpl/1e3, l_Mc,  color="r")
 
 # major element chemistry
 ax[1].set(ylabel="Mantle composition [wt%]")
-ax[1].plot(l_rpl/1e3, wtMgO*100,          color="k") 
-ax[1].plot(l_rpl/1e3, wtFeO*100,          color="k", linestyle=":")
-ax[1].plot(l_rpl/1e3, wtSiO2*100,         color="k", linestyle="--")
-ax[1].plot(l_rpl/1e3, wt_core[:,nFe]*100, color="r", linestyle=":")
-ax[1].plot(l_rpl/1e3, wt_core[:,nSi]*100, color="r", linestyle="--")
-ax[1].plot(l_rpl/1e3, rFe*100,            color="b", linestyle=":")
-ax[1].plot(l_rpl/1e3, rSi*100,            color="b", linestyle="--")
+ax[1].plot(l_rpl/1e3, wtMgO*100,          color="k")                  # MgO wt% in the mantle
+ax[1].plot(l_rpl/1e3, wtFeO*100,          color="k", linestyle=":")   # FeO
+ax[1].plot(l_rpl/1e3, wtSiO2*100,         color="k", linestyle="--")  # SiO2
+ax[1].plot(l_rpl/1e3, wt_core[:,nFe]*100, color="r", linestyle=":")   # Fe wt% in the core
+ax[1].plot(l_rpl/1e3, wt_core[:,nSi]*100, color="r", linestyle="--")  # Ni
+ax[1].plot(l_rpl/1e3, rFe*100,            color="b", linestyle=":")   #(Fe in mantle)/(Fe in entire planet)
+ax[1].plot(l_rpl/1e3, rSi*100,            color="b", linestyle="--")  #(Si ...)
 
 ax[1].set_ylim([0,60])
 
 # minor element abundance
 ax[2].set(ylabel="Mantle abundance [ppm]")
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nV]*1e6, color="k", linestyle="-")
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nNi]*1e4, color="r", linestyle="-")
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nV]*1e6, color="k", linestyle="-")   # V ppm in the mantle
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nNi]*1e4, color="r", linestyle="-")  # Ni pp? in the mantle
 
 
 # oxygen fugacity

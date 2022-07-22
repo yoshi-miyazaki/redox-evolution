@@ -22,7 +22,7 @@ def mass2radius(M, rho):
 
 # calculate the shell width from mass and density
 def mass2shell_width(M, rho, r_in):
-    return np.power(M * 3./(4*np.pi*rho) + r_in, 1./3) + r_in
+    return np.power(M * 3./(4*np.pi*rho) + r_in**3, 1./3) - r_in
 
 
 ''' equilibrium conditions (base of magma ocean) '''
