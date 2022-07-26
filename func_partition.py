@@ -36,9 +36,14 @@ def partition_MO_impactor(molep, T_eq, P_eq):
     The equilibrium reactions occurring are:
     
     2 Fe + SiO2 <--> 2 FeO + Si
-    2 Ni + SiO2 <--> 2 NiO + Si
+      Fe + NiO  <-->   NiO + Fe
 
-    For simplicity, we ignore the contribution of V in mass balance.
+    For simplicity, we ignore the contribution of minor elements in mass balance.
+    
+    input --
+    molep: mole amount of impactor+magma ocean 
+    P_eq:  equilibrium pressure = base of magma ocean = metal pond
+    T_eq:  equilibrium temperature 
     '''
 
     # calc partition coefficients
@@ -86,6 +91,11 @@ def partition_MO_impactor(molep, T_eq, P_eq):
 def df(met_Fe, molep, Kd_Ni, Kd_Si):
     '''
     Returns the difference between the actual Kd(Si-Fe) and calculated value for Kd(Si-Fe). 
+
+    input --
+    met_Fe: assumed amount of Fe in the metal phase
+    molep:  elemental abundance of metal + silicate phases
+    Kd_Ni:  equilibrium constant for the Fe+NiO = Ni+FeO reaction
     '''
 
     tot_O,  tot_Mg, tot_Al = molep[nO],  molep[nMg], molep[nAl]
@@ -121,8 +131,8 @@ def massbalance_metFe(met_Fe, molep, Kd_Ni, Kd_Si):
     The amoount of Fe in the metal phase is calculated in `partition_MO_impactor`.
     Based of its result, the rest of the composition is determined based on mass balance
 
-    input:  met_Fe (Fe in metal phase) + total molar amount of O, Mg, Si, Fe, Ni
-    output: composition vector of silicate and metal phases
+    input  -- met_Fe (Fe in metal phase) + total molar amount of O, Mg, Si, Fe, Ni
+    output -- composition vector of silicate and metal phases
     '''
 
     tot_O,  tot_Mg, tot_Al = molep[nO],  molep[nMg], molep[nAl]
@@ -157,16 +167,27 @@ def massbalance_metFe(met_Fe, molep, Kd_Ni, Kd_Si):
 def partition_minor(n_sil, n_met, T_eq, P_eq):
     '''
     Calculate partitioing of minor elements between silicate and metal phases
+
+    n_sil: major element compositions of the silicate phase
+    n_met:                               the metal phase
+    
+    The total mole of minor elements in n_sil + n_met are correct, 
+    but the partition between the two phases is not considered in partition_MO_impactor
     '''
     
     Kd_V  = calc_Kd("V", T_eq, P_eq)
 
     # calc total amount of major elements in silicate/metal phases
+    #
+    # when calculating [V] or [V2O3], the total mole of silicates or metal is needed.
+    # but because minor elements contribute trivial amount compared to major elements,
+    # we approximate tot_sil by mole of Mg, Al, Si, Fe, and Ni
     tot_sil, tot_met = 0., 0.
-    for i in [nMg, nSi, nFe, nNi]:
+    for i in [nMg, nAl, nSi, nFe, nNi]:
         tot_sil += n_sil[i]
         tot_met += n_met[i]
 
+    # find the amount of V in metal phase (x0, x1) by bisection search
     sil_Fe, met_Fe = n_sil[nFe], n_met[nFe]
     tot_V          = n_sil[nV] + n_met[nV]
     
@@ -202,12 +223,15 @@ def partition_minor(n_sil, n_met, T_eq, P_eq):
 #@njit
 def dg(met_V, tot_V, met_Fe, sil_Fe, tot_met, tot_sil, Kd_V):
     '''
-    Compare the difference between  Kd(V-Fe) and the calculated value for K_d(V-Fe). 
+    Compare the difference between  Kd(V-Fe) and the calculated value for K_d(V-Fe).  
     (Root of function will be found at the correct value of K_d)
 
     input: assumed molar amount of V in metal phase, 
     -      Fe in metal, Fe in silicate, total cataion in metal, and total cation in silicatet phase
+    
 
+    stoichiomery:
+    V - V2O3 + Fe = FeO
     '''
     # V as V2O3
     sil_V   = tot_V - met_V

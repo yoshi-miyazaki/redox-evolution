@@ -32,9 +32,10 @@ melt_factor = 20  # melt volume produced upon impact = melt_factor * vol_impacto
 
 ''' composition '''
 # set initial composition in wt% 
-# (in the order of MgO, Al2O3, SiO2, V2O3, FeO, NiO)
+# (in the order of MgO, Al2O3, SiO2, V2O3, CrO, FeO, CoO, NiO)
 # -> and convert to molar
-xinit_mantle     = np.array([36., 4., 49., 0.00606, 7., 0.]) #23.41, 2.3, 21.09, 0.00606, 6.22, 0.])
+xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0.])
+#23.41, 2.3, 21.09, 0.00606, 6.22, 0.])
 
 # set core composition in wt%
 # (in the order of Fe, Si)

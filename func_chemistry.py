@@ -1,13 +1,13 @@
 import numpy as np
 
 ''' element information '''
-Nmol = 7
-nO, nMg, nAl, nSi, nV, nFe, nNi = 0, 1, 2, 3, 4, 5, 6
+Nmol = 9
+nO, nMg, nAl, nSi, nV, nCr, nFe, nCo, nNi = 0, 1, 2, 3, 4, 5, 6, 7, 8
 list_major = [nMg, nAl, nSi, nFe, nNi]
-list_minor = [nV]
+list_minor = [nV, nCr, nCo]
 
 # O, Mg, Si, V, Fe, Ni
-molar_mass = np.array([16, 24.3, 26.98, 28., 50.94, 55.8, 58.7])*1e-3
+molar_mass = np.array([16, 24.3, 26.98, 28., 50.94, 52., 55.8, 58.9, 58.7])*1e-3
 molar_mass_o  = molar_mass[nO]
 molar_mass_mg = molar_mass[nMg]
 molar_mass_al = molar_mass[nAl]
@@ -35,20 +35,25 @@ def set_initial_mantle_composition(x_oxide):
                             molar_mass[nAl]*2+ molar_mass[nO]*3,  # Al2O3
                             molar_mass[nSi]  + molar_mass[nO]*2,  # SiO2
                             molar_mass[nV]*2 + molar_mass[nO]*3,  # V2O3
+                            molar_mass[nCr]  + molar_mass[nO],    # CrO
                             molar_mass[nFe]  + molar_mass[nO],    # FeO
+                            molar_mass[nCo]  + molar_mass[nO],    # CoO
                             molar_mass[nNi]  + molar_mass[nO]])   # NiO
     
     # convert wt% into mole amount (unit: mole/1 kg of oxides)
     m_oxide     = r_oxide/molar_oxide
 
     # convert oxide to element (unit: mole/1 kg of oxides)
-    m_element   = np.array([m_oxide[0] + m_oxide[1]*3 + m_oxide[2]*2 + m_oxide[3]*3 + m_oxide[4] + m_oxide[5], # O
+    m_element   = np.array([m_oxide[0] + m_oxide[1]*3 + m_oxide[2]*2 + m_oxide[3]*3 + m_oxide[4] + m_oxide[5]
+                            + m_oxide[6] + m_oxide[7],  # O
                             m_oxide[0],    # Mg
                             m_oxide[1]*2,  # Al
                             m_oxide[2],    # Si
                             m_oxide[3]*2,  # V
-                            m_oxide[4],    # Fe
-                            m_oxide[5]])   # Ni
+                            m_oxide[3],    # Cr
+                            m_oxide[5],    # Fe
+                            m_oxide[6],    # Co
+                            m_oxide[7]])   # Ni
     
     return m_element
 
@@ -77,7 +82,9 @@ def set_initial_core_composition(x_metal):
                             0.,           # Al
                             0.,           # Si
                             0.,           # V
+                            0.,           # Cr
                             m_metal[0],   # Fe
+                            0.,           # Co
                             m_metal[1]])  # Ni
     
     return m_element
