@@ -28,17 +28,17 @@ The magma ocean covers the "metal pond" before the next impactor arrives.
 rpl     = 1000e3   # initial embryo size (radius in m)
 f_core  = 0.08      # fraction of core mass
 
-melt_factor = 20  # melt volume produced upon impact = melt_factor * vol_impactor
+melt_factor = 100  # melt volume produced upon impact = melt_factor * vol_impactor
 
 ''' composition '''
 # set initial composition in wt% 
 # (in the order of MgO, Al2O3, SiO2, V2O3, CrO, FeO, CoO, NiO)
 # -> and convert to molar
-xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0.])
-#23.41, 2.3, 21.09, 0.00606, 6.22, 0.])
+xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.0002623, 7., 0.000513,  0.])
+#xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0.])
 
 # set core composition in wt%
-# (in the order of Fe, Si)
+# (in the order of Fe, Ni)
 xinit_core       = np.array([85, 5.])
 
 
@@ -110,7 +110,7 @@ while (1):
     # calculate the depth h of the magma ocean formed
     # ... (melt_factor)*(volume of impactor) is assumed to become molten after the impact
     #     this implicitly assumes that magma ocean solidifies each time the impact happens
-    h = calculate_h(melt_factor * 4./3*(r_impactor)**3, rpl)
+    h = calculate_h(melt_factor * 4./3*np.pi*(r_impactor)**3, rpl)
 
     # h_frac is the fraction of the mantle that is molten (magma ocean)
     # this value is probably small considering the rapid solidification,
