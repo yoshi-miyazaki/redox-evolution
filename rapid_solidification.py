@@ -28,13 +28,13 @@ The magma ocean covers the "metal pond" before the next impactor arrives.
 rpl     = 1000e3   # initial embryo size (radius in m)
 f_core  = 0.08      # fraction of core mass
 
-melt_factor = 100  # melt volume produced upon impact = melt_factor * vol_impactor
+melt_factor = 55  # melt volume produced upon impact = melt_factor * vol_impactor
 
 ''' composition '''
 # set initial composition in wt% 
-# (in the order of MgO, Al2O3, SiO2, V2O3, CrO, FeO, CoO, NiO)
+# (in the order of MgO, Al2O3, SiO2, V2O3, CrO, FeO, CoO, NiO, TaO2, NbO)
 # -> and convert to molar
-xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.0002623, 7., 0.000513,  0.])
+xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0., 6.6e-6, 8.55e-5])
 #xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0.])
 
 # set core composition in wt%
@@ -216,8 +216,12 @@ ax[1].set_ylim([0,60])
 
 # minor element abundance
 ax[2].set(ylabel="Mantle abundance [ppm]")
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nV]*1e6, color="k", linestyle="-")   # V ppm in the mantle
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nNi]*1e4, color="r", linestyle="-")  # Ni pp? in the mantle
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nV]*1e5, color="k", linestyle="-")   # V ppm in the mantle  (pattern, third value)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nNi]*1e4, color="r", linestyle="-")  # Ni pp? in the mantle (matches, pattern)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nCo]*1e4, color="b", linestyle=":")  # Co pp? in the mantle (close match, pattern)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nCr]*1e4, color="g", linestyle=":")  # Cr pp? in the mantle (pattern, half value)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nTa]*1e9, color="b", linestyle="-")  # Ta ppb in the mantle (forced match, pattern)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nNb]*1e6, color="g", linestyle="-")  # Nb ppm in the mantle (forced match, pattern)
 
 
 # oxygen fugacity

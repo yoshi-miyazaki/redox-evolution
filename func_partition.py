@@ -18,6 +18,10 @@ def calc_Kd(metal, T, P):
         a, b, c = -0.17, -2730, 0.
     elif (metal == "Co"):
         a, b, c = 0.13, 2057, -57
+    elif (metal == "Ta"):
+        a, b, c = 0.84, -13806, -115
+    elif (metal == "Nb"):
+        a, b, c = 2.66, -14032, -199
     else:
         print("calc_Kd: no partition information available for", metal)
 
@@ -55,6 +59,7 @@ def partition_MO_impactor(molep, T_eq, P_eq):
     # calc partition coefficients
     Kd_Ni = calc_Kd("Ni", T_eq, P_eq)  # Ni
     Kd_Si = calc_KdSi(T_eq, P_eq)
+    Kd_Cr = calc_Kd("Cr", T_eq, P_eq)
 
     # determine the range
     tot_Si, tot_Fe = molep[nSi], molep[nFe]
@@ -65,8 +70,8 @@ def partition_MO_impactor(molep, T_eq, P_eq):
     x0 = tot_Fe * 0.001
     x1 = tot_Fe - (molep[nO] - molep[nMg] - molep[nAl] * 1.5 - molep[nSi] * 2 - molep[nNi] - molep[nCo] - molep[nCr])
     
-    f0 = df(x0, molep, Kd_Ni, Kd_Si)
-    f1 = df(x1, molep, Kd_Ni, Kd_Si)
+    f0 = df(x0, molep, Kd_Ni, Kd_Si, Kd_Cr)
+    f1 = df(x1, molep, Kd_Ni, Kd_Si, Kd_Cr)
 
 
     if (f0 * f1 > 0):
@@ -79,14 +84,15 @@ def partition_MO_impactor(molep, T_eq, P_eq):
     eps = 1e-8
     while (np.abs(f1 - f0) > eps):
         xA = (x0 + x1) * .5
-        fA = df(xA, molep, Kd_Ni, Kd_Si)
+        fA = df(xA, molep, Kd_Ni, Kd_Si, Kd_Cr)
 
         if (f0 * fA < 0):
             x1, f1 = xA, fA
         else:
             x0, f0 = xA, fA
 
-    mole_sil, mole_met = massbalance_metFe(xA, molep, Kd_Ni, Kd_Si)
+    # mole_sil, mole_met = massbalance_metFe(xA, molep, Kd_Ni, Kd_Si)
+    mole_sil, mole_met = massbalance_metFe(xA, molep, Kd_Ni, Kd_Si, Kd_Cr)
 
     # restore minor elements
     for i in range(Nmol):
@@ -100,7 +106,7 @@ def partition_MO_impactor(molep, T_eq, P_eq):
 
 
 # @njit
-def df(met_Fe, molep, Kd_Ni, Kd_Si):
+def df(met_Fe, molep, Kd_Ni, Kd_Si, Kd_Cr):
     '''
     Returns the difference between the actual Kd(Si-Fe) and calculated value for Kd(Si-Fe). 
 
@@ -110,17 +116,22 @@ def df(met_Fe, molep, Kd_Ni, Kd_Si):
     Kd_Ni:  equilibrium constant for the Fe+NiO = Ni+FeO reaction
     '''
 
-    tot_Mg, tot_Al, tot_Si, tot_Fe, tot_Ni = molep[nMg],molep[nAl],molep[nSi],molep[nFe],molep[nNi]
+    tot_Mg, tot_Al, tot_Si, tot_Fe, tot_Ni,  tot_Cr = molep[nMg],molep[nAl],molep[nSi],molep[nFe],molep[nNi],molep[nCr]
     tot_O = molep[nO]
 
-    
-    # calc Ni amount 
+    # Calculate Fe amount
     sil_Fe = tot_Fe - met_Fe
+
+    # calc Ni amount
     sil_Ni = tot_Ni * sil_Fe / (sil_Fe + Kd_Ni * met_Fe)
     met_Ni = tot_Ni - sil_Ni
 
+    # calc Cr amount
+    sil_Cr = tot_Cr * sil_Fe / (sil_Fe + Kd_Cr * met_Fe)
+    met_Cr = tot_Cr - sil_Cr
+
     # calc Si amount
-    sil_Si = (tot_O - sil_Ni - sil_Fe - tot_Mg - tot_Al * 1.5) / 2.
+    sil_Si = (tot_O - sil_Ni - sil_Fe - tot_Mg - tot_Al * 1.5 - sil_Cr) / 2.
     met_Si = tot_Si - sil_Si
 
     # assume all Mg is exsits as oxides
@@ -128,8 +139,8 @@ def df(met_Fe, molep, Kd_Ni, Kd_Si):
     sil_Al = tot_Al
 
     # compare with Kd_Si
-    tot_met = met_Si + met_Fe + met_Ni
-    tot_sil = sil_Si + sil_Fe + sil_Ni + sil_Mg + sil_Al
+    tot_met = met_Si + met_Fe + met_Ni + met_Cr
+    tot_sil = sil_Si + sil_Fe + sil_Ni + sil_Mg + sil_Al + sil_Cr
 
     xSi_met = met_Si / tot_met
     xSi_sil = sil_Si / tot_sil
@@ -139,7 +150,7 @@ def df(met_Fe, molep, Kd_Ni, Kd_Si):
     return xSi_met * (xFe_sil * xFe_sil) / (xFe_met * xFe_met * xSi_sil) - Kd_Si
 
 
-def massbalance_metFe(met_Fe, molep, Kd_Ni, Kd_Si):
+def massbalance_metFe(met_Fe, molep, Kd_Ni, Kd_Si, Kd_Cr):
     '''
     The amoount of Fe in the metal phase is calculated in `partition_MO_impactor`.
     Based of its result, the rest of the composition is determined based on mass balance
@@ -151,21 +162,27 @@ def massbalance_metFe(met_Fe, molep, Kd_Ni, Kd_Si):
     tot_O, tot_Mg, tot_Al = molep[nO], molep[nMg], molep[nAl]
     tot_Si, tot_Fe, tot_Ni = molep[nSi], molep[nFe], molep[nNi]
 
+    tot_Cr = molep[nCr]
+
     # calc Fe, Ni amount 
     sil_Fe = tot_Fe - met_Fe
     sil_Ni = tot_Ni * sil_Fe / (sil_Fe + Kd_Ni * met_Fe)
     met_Ni = tot_Ni - sil_Ni
 
+    # calc Cr amount
+    sil_Cr = tot_Cr * sil_Fe / (sil_Fe + Kd_Cr * met_Fe)
+    met_Cr = tot_Cr - sil_Cr
+
     # calc Si amount
-    sil_Si = (tot_O - sil_Ni - sil_Fe - tot_Mg - tot_Al * 1.5) / 2.
+    sil_Si = (tot_O - sil_Ni - sil_Fe - tot_Mg - tot_Al * 1.5 - sil_Cr) / 2.
     met_Si = tot_Si - sil_Si
 
     # store results
     mole_sil = np.zeros(Nmol)
     mole_met = np.zeros(Nmol)
 
-    mole_sil[nSi], mole_sil[nFe], mole_sil[nNi] = sil_Si, sil_Fe, sil_Ni
-    mole_met[nSi], mole_met[nFe], mole_met[nNi] = met_Si, met_Fe, met_Ni
+    mole_sil[nSi], mole_sil[nFe], mole_sil[nNi], mole_sil[nCr] = sil_Si, sil_Fe, sil_Ni, sil_Cr
+    mole_met[nSi], mole_met[nFe], mole_met[nNi], mole_met[nCr] = met_Si, met_Fe, met_Ni, met_Cr
 
     # assume all Mg is exsits as oxides
     mole_sil[nMg] = molep[nMg]
@@ -187,9 +204,10 @@ def partition_minor(n_sil, n_met, T_eq, P_eq):
     but the partition between the two phases is not considered in partition_MO_impactor
     '''
 
-    Kd_V = calc_Kd("V", T_eq, P_eq)
-    Kd_Cr = calc_Kd("Cr", T_eq, P_eq)
+    Kd_V  = calc_Kd("V" , T_eq, P_eq)
     Kd_Co = calc_Kd("Co", T_eq, P_eq)
+    Kd_Ta = calc_Kd("Ta", T_eq, P_eq)
+    Kd_Nb = calc_Kd("Nb", T_eq, P_eq)
 
     
     # calc total amount of major elements in silicate/metal phases
@@ -210,10 +228,12 @@ def partition_minor(n_sil, n_met, T_eq, P_eq):
 
         if (i==nV):
             Kd_el, df_el = Kd_V,  df_V
-        elif (i==nCr):
-            Kd_el, df_el = Kd_Cr, df_Cr
         elif (i==nCo):
             Kd_el, df_el = Kd_Co, df_Co
+        elif (i==nTa):
+            Kd_el, df_el = Kd_Ta, df_Ta
+        elif (i==nNb):
+            Kd_el, df_el = Kd_Nb, df_Nb
             
         found_met_el = bisection_search_minor(tot_el, met_Fe, sil_Fe, tot_met, tot_sil, Kd_el, df_el)
         n_met[i] = found_met_el
@@ -260,8 +280,7 @@ def el_met_max(x0, tot_El, met_Fe, sil_Fe, tot_met, tot_sil, Kd_El, df_El):
     return x1
 
 
-# @njit
-def df_V(met_V, tot_V, met_Fe, sil_Fe, tot_met, tot_sil, Kd_V):
+def df_V (met_V, tot_V, met_Fe, sil_Fe, tot_met, tot_sil, Kd_V):
     '''
     Compare the difference between  Kd(V-Fe) and the calculated value for K_d(V-Fe).  
     (Root of function will be found at the correct value of K_d)
@@ -284,27 +303,6 @@ def df_V(met_V, tot_V, met_Fe, sil_Fe, tot_met, tot_sil, Kd_V):
 
     return xV_met * xFe_sil ** 1.5 / (xV_sil * xFe_met ** 1.5) - Kd_V
 
-
-# @njit
-def df_Cr(met_Cr, tot_Cr, met_Fe, sil_Fe, tot_met, tot_sil, Kd_Cr):
-    '''
-    stoichiomery:
-    V - V2O3 + Fe = FeO
-    Cr - Cr2O7 + 7Fe = 7FeO + 2Cr
-    '''
-    # V as V2O3
-    sil_Cr = tot_Cr - met_Cr
-
-    xCr_met = met_Cr / (tot_met + met_Cr)
-    xCr_sil = sil_Cr / (tot_sil + sil_Cr)
-    xFe_met = met_Fe / (tot_met + met_Cr)
-    xFe_sil = sil_Fe / (tot_sil + sil_Cr)
-
-    # return xCr_met * xFe_sil ** 3.5 / (xCr_sil * xFe_met ** 3.5) - Kd_Cr
-    return xCr_met * xFe_sil  / (xCr_sil * xFe_met) - Kd_Cr
-
-
-# @njit
 def df_Co(met_Co, tot_Co, met_Fe, sil_Fe, tot_met, tot_sil, Kd_Co):
     '''
     stoichiomery:
@@ -320,3 +318,37 @@ def df_Co(met_Co, tot_Co, met_Fe, sil_Fe, tot_met, tot_sil, Kd_Co):
     xFe_sil = sil_Fe / (tot_sil + sil_Co)
 
     return xCo_met * xFe_sil / (xCo_sil * xFe_met) - Kd_Co
+
+def df_Ta(met_Ta, tot_Ta, met_Fe, sil_Fe, tot_met, tot_sil, Kd_Ta):
+    '''
+    stoichiomery:
+    V - V2O3 + Fe = FeO
+    Co - CoO + Fe = FeO + Co
+    Ta - TaO2 + 2Fe = 2FeO + Ta
+    '''
+    # V as V2O3
+    sil_Ta = tot_Ta - met_Ta
+
+    xTa_met = met_Ta / (tot_met + met_Ta)
+    xTa_sil = sil_Ta / (tot_sil + sil_Ta)
+    xFe_met = met_Fe / (tot_met + met_Ta)
+    xFe_sil = sil_Fe / (tot_sil + sil_Ta)
+
+    return xTa_met * xFe_sil ** 2 / (xTa_sil * xFe_met ** 2) - Kd_Ta
+
+def df_Nb(met_Nb, tot_Nb, met_Fe, sil_Fe, tot_met, tot_sil, Kd_Nb):
+    '''
+    stoichiomery:
+    V - V2O3 + Fe = FeO
+    Co - CoO + Fe = FeO + Co
+    Nb (assuming NbO) = NbO + Fe = FeO + Nb
+    '''
+    # V as V2O3
+    sil_Nb = tot_Nb - met_Nb
+
+    xNb_met = met_Nb / (tot_met + met_Nb)
+    xNb_sil = sil_Nb / (tot_sil + sil_Nb)
+    xFe_met = met_Fe / (tot_met + met_Nb)
+    xFe_sil = sil_Fe / (tot_sil + sil_Nb)
+
+    return xNb_met * xFe_sil / (xNb_sil * xFe_met) - Kd_Nb

@@ -1,13 +1,13 @@
 import numpy as np
 
 ''' element information '''
-Nmol = 9
-nO, nMg, nAl, nSi, nV, nCr, nFe, nCo, nNi = 0, 1, 2, 3, 4, 5, 6, 7, 8 # nCr, nCo, 
-list_major = [nMg, nAl, nSi, nFe, nNi]
-list_minor = [nV, nCr ,nCo]
+Nmol = 11
+nO, nMg, nAl, nSi, nV, nCr, nFe, nCo, nNi, nTa, nNb = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 # nCr, nCo,
+list_major = [nMg, nAl, nSi, nFe, nNi, nCr]
+list_minor = [nV, nCo, nTa, nNb]
 
-# O, Mg, Si, V, Fe, Ni
-molar_mass = np.array([16, 24.3, 26.98, 28., 50.94, 52., 55.8, 58.9, 58.7])*1e-3 
+# O, Mg, Si, V, Fe, Ni, Ta, Nb
+molar_mass = np.array([16, 24.3, 26.98, 28., 50.94, 52., 55.8, 58.9, 58.7, 47.87, 92.9])*1e-3
 molar_mass_o  = molar_mass[nO]
 molar_mass_mg = molar_mass[nMg]
 molar_mass_al = molar_mass[nAl]
@@ -15,6 +15,8 @@ molar_mass_si = molar_mass[nSi]
 molar_mass_v  = molar_mass[nV] 
 molar_mass_fe = molar_mass[nFe]
 molar_mass_ni = molar_mass[nNi]
+molar_mass_ta = molar_mass[nTa]
+molar_mass_nb = molar_mass[nNb]
 
 
 def set_initial_mantle_composition(x_oxide):
@@ -38,7 +40,10 @@ def set_initial_mantle_composition(x_oxide):
                             molar_mass[nCr]  + molar_mass[nO],    # CrO
                             molar_mass[nFe]  + molar_mass[nO],    # FeO
                             molar_mass[nCo]  + molar_mass[nO],    # CoO
-                            molar_mass[nNi]  + molar_mass[nO]])   # NiO
+                            molar_mass[nNi]  + molar_mass[nO],    # NiO
+                            molar_mass[nTa]  + molar_mass[nO]*2,  # TaO2
+                            molar_mass[nNb]  + molar_mass[nO]])   # NbO
+
     
     # convert wt% into mole amount (unit: mole/1 kg of oxides)
     m_oxide     = r_oxide/molar_oxide
@@ -53,7 +58,9 @@ def set_initial_mantle_composition(x_oxide):
                             m_oxide[4],    # Cr
                             m_oxide[5],    # Fe
                             m_oxide[6],    # Co
-                            m_oxide[7]])   # Ni
+                            m_oxide[7],    # Ni
+                            m_oxide[8],    # Ta
+                            m_oxide[9]])   # Nb
     
     return m_element
 
@@ -86,7 +93,9 @@ def set_initial_core_composition(x_metal):
                             0.,           # Cr
                             m_metal[0],   # Fe
                             0.,           # Co
-                            m_metal[1]])  # Ni
+                            m_metal[1],   # Ni
+                            0.,           # Ta
+                            0.])          # Nb
     
     return m_element
 
