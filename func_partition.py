@@ -352,3 +352,62 @@ def df_Nb(met_Nb, tot_Nb, met_Fe, sil_Fe, tot_met, tot_sil, Kd_Nb):
     xFe_sil = sil_Fe / (tot_sil + sil_Nb)
 
     return xNb_met * xFe_sil / (xNb_sil * xFe_met) - Kd_Nb
+
+def df_FeO(met_Fe, xFeO, xFeO_onehalf, Kd_FeO):
+    xFe = met_Fe
+    return (xFeO - 3 * xFe) ** 3 / (xFeO_onehalf + 2 * xFe) ** 2 / xFe - Kd_FeO
+
+def seg_fe_phase(n_met, n_sil, tot_sil, T_eq, P_eq):
+    '''
+    Fe + 2FeO1.5 = 3FeO
+
+    [FeO]**3 / [Fe] / [Fe2O3]**2
+
+    1.0 o   1.5 fe    <- Fe2O3
+    1.0 o   1.0 fe    <- FeO
+            1.2 fe
+
+    Fe + 2FeO1.5 -> 3FeO
+    '''
+
+    Kd_FeO = calc_Kd("FeO", T_eq, P_eq)
+
+    met_Fe = n_met[nFe]
+    sil_Fe = n_sil[nFe]
+    available_O = n_sil[nO] - n_sil[nMg] - n_sil[nNi] - n_sil[nFe] - n_sil[nAl] * 1.5 - n_sil[nSi] * 2.0 - n_sil[nCr] - n_sil[nCo]
+
+    # (1.5x + 1.0(total_fe - x) = total
+    xFe = 1
+    FeO_onehalf = 2. * (available_O - sil_Fe)
+    FeO = sil_Fe - FeO_onehalf
+
+    xFeO_onehalf = FeO_onehalf / tot_sil
+    xFeO = FeO / tot_sil
+
+    x0 = 1e-6
+    f0 = df_FeO(x0, xFeO, xFeO_onehalf, Kd_FeO)
+
+    x1 = sil_Fe / 3.
+    f1 = df_FeO(x1, xFeO, xFeO_onehalf, Kd_FeO)
+
+    if (f0 * f1):
+        print("Partition Iron Segregation Bisection Error, same sign ", f0, f1)
+
+    eps = 1e-6
+
+    while(np.abs(f1 - f0) > eps):
+        xA = (x0 + x1) * .5
+        fA = df_FeO(xA, xFeO, xFeO_onehalf, Kd_FeO)
+
+        if (f0 * fA < 0):
+            x1, f1 = xA, fA
+        else:
+            x0, f0 = xA, fA
+
+    n_met[nFe] += xA
+    n_sil[nFe] -= xA
+
+    return n_sil, n_met
+
+
+

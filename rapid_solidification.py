@@ -28,18 +28,24 @@ The magma ocean covers the "metal pond" before the next impactor arrives.
 rpl     = 1000e3   # initial embryo size (radius in m)
 f_core  = 0.08      # fraction of core mass
 
-melt_factor = 55  # melt volume produced upon impact = melt_factor * vol_impactor
+melt_factor = 16.  # melt volume produced upon impact = melt_factor * vol_impactor
 
 ''' composition '''
 # set initial composition in wt% 
 # (in the order of MgO, Al2O3, SiO2, V2O3, CrO, FeO, CoO, NiO, TaO2, NbO)
 # -> and convert to molar
-xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0., 6.6e-6, 8.55e-5])
+
+# 2015 init Conditions
+fe_mantle, fe_core = chem_mass_fe(f_core, 0.55, 0.1866)
+ni_mantle, ni_core = chem_mass_ni(0.05, f_core, 0.01091)
+
+xinit_mantle     = np.array([0.0954e2, 0.0102e2, 0.1070e2, 60.6e-4, 2623e-4, fe_mantle, 0.000513e2, ni_mantle, 18.3e-7, 345e-7])
+# xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0., 6.6e-6, 8.55e-5])
 #xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0.])
 
 # set core composition in wt%
 # (in the order of Fe, Ni)
-xinit_core       = np.array([85, 5.])
+xinit_core       = np.array([fe_core, ni_core])
 
 
 # ----- [ code ] -----
@@ -161,6 +167,8 @@ while (1):
     l_fO2 = np.append(l_fO2, fO2_now)
     
     #if (0):
+
+
         
 
     ''' update mantle & core compositions '''
@@ -216,13 +224,21 @@ ax[1].set_ylim([0,60])
 
 # minor element abundance
 ax[2].set(ylabel="Mantle abundance [ppm]")
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nV]*1e5, color="k", linestyle="-")   # V ppm in the mantle  (pattern, third value)
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nNi]*1e4, color="r", linestyle="-")  # Ni pp? in the mantle (matches, pattern)
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nCo]*1e4, color="b", linestyle=":")  # Co pp? in the mantle (close match, pattern)
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nCr]*1e4, color="g", linestyle=":")  # Cr pp? in the mantle (pattern, half value)
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nTa]*1e9, color="b", linestyle="-")  # Ta ppb in the mantle (forced match, pattern)
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nNb]*1e6, color="g", linestyle="-")  # Nb ppm in the mantle (forced match, pattern)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nV ]*1e6 -  113, color="k", linestyle="-")  # V ppm in the mantle  (pattern, third value)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nNi]*1e6 - 3000, color="r", linestyle="-")  # Ni pp? in the mantle (matches, pattern)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nCo]*1e6 -  200, color="b", linestyle=":")  # Co pp? in the mantle (close match, pattern)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nCr]*1e6 - 4500, color="g", linestyle=":")  # Cr pp? in the mantle (pattern, half value)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nTa]*1e9 -   36, color="b", linestyle="-")  # Ta ppb in the mantle (forced match, pattern)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nNb]*1e9 -  675, color="g", linestyle="-")  # Nb ppm in the mantle (forced match, pattern)
 
+sum_of_squares = ((wt_mantle[-1:, nV ] - 113e-6)**2 / 113e-6) +\
+                 ((wt_mantle[-1:, nNi] - 3000e-6)**2 / 3000e-6) +\
+                 ((wt_mantle[-1:, nCo] - 200e-6)**2 / 200e-6) +\
+                 ((wt_mantle[-1:, nCr] - 4500e-6)**2 / 4500e-6) +\
+                 ((wt_mantle[-1:, nTa] - 36e-9)**2 / 36e-9) +\
+                 ((wt_mantle[-1:, nNb] - 675e-9)**2 / 675e-9)
+
+print("Error Value: ", sum_of_squares)
 
 # oxygen fugacity
 ax[3].set(ylabel="Oxygen fugacity [$\Delta$IW]")
