@@ -15,11 +15,14 @@ def shell_mass(rho, r_planet, depth):
 # takes percent of core, proportion of iron in core/mantle, and total percent
 # returns fe of iron in core and mantle
 def chem_mass_fe(r, p, t):
-    fe_mantle = t / (p+1) / (1-r) *100
-    fe_core   = t * p / r / (p+1) *100
+    fe_mantle = t * (1 - p) / (1 - r) * 100
+    fe_core   = t * p / r * 100
     print("Iron Mantle, Iron Core: ", fe_mantle, fe_core)
     if (fe_mantle < 0 or fe_core < 0):
-        print("Error: iron less than 0")
+        print("Error: iron less than 0%")
+        sys.exit()
+    elif (fe_mantle > 100 or fe_core > 100):
+        print("Error: iron more than 100%")
         sys.exit()
     return fe_mantle, fe_core
 
@@ -28,7 +31,10 @@ def chem_mass_ni(ni_core, r, t):
     ni_core *= 100
     print("Nickel Mantle, Nickel Core: ", ni_mantle, ni_core)
     if (ni_mantle < 0 or ni_core < 0):
-        print("Error: nickel less than 0")
+        print("Error: nickel less than 0%")
+        sys.exit()
+    elif (ni_mantle > 100 or ni_core > 100):
+        print("Error: nickel more than 100%")
         sys.exit()
     return ni_mantle, ni_core
 

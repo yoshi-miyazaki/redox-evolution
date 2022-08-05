@@ -22,6 +22,8 @@ def calc_Kd(metal, T, P):
         a, b, c = 0.84, -13806, -115
     elif (metal == "Nb"):
         a, b, c = 2.66, -14032, -199
+    elif (metal == "FeO"):
+        return 70
     else:
         print("calc_Kd: no partition information available for", metal)
 
@@ -357,7 +359,7 @@ def df_FeO(met_Fe, xFeO, xFeO_onehalf, Kd_FeO):
     xFe = met_Fe
     return (xFeO - 3 * xFe) ** 3 / (xFeO_onehalf + 2 * xFe) ** 2 / xFe - Kd_FeO
 
-def seg_fe_phase(n_met, n_sil, tot_sil, T_eq, P_eq):
+def seg_fe_phase(n_met, n_sil, T_eq, P_eq):
     '''
     Fe + 2FeO1.5 = 3FeO
 
@@ -369,6 +371,11 @@ def seg_fe_phase(n_met, n_sil, tot_sil, T_eq, P_eq):
 
     Fe + 2FeO1.5 -> 3FeO
     '''
+
+    tot_sil, tot_met = 0., 0.
+    for i in list_major:
+        tot_sil += n_sil[i]
+        tot_met += n_met[i]
 
     Kd_FeO = calc_Kd("FeO", T_eq, P_eq)
 
@@ -390,13 +397,14 @@ def seg_fe_phase(n_met, n_sil, tot_sil, T_eq, P_eq):
     x1 = sil_Fe / 3.
     f1 = df_FeO(x1, xFeO, xFeO_onehalf, Kd_FeO)
 
-    if (f0 * f1):
+    if (f0 * f1 > 0):
         print("Partition Iron Segregation Bisection Error, same sign ", f0, f1)
 
     eps = 1e-6
 
     while(np.abs(f1 - f0) > eps):
         xA = (x0 + x1) * .5
+        #print(xA)
         fA = df_FeO(xA, xFeO, xFeO_onehalf, Kd_FeO)
 
         if (f0 * fA < 0):
@@ -406,6 +414,8 @@ def seg_fe_phase(n_met, n_sil, tot_sil, T_eq, P_eq):
 
     n_met[nFe] += xA
     n_sil[nFe] -= xA
+
+    print(n_met[nFe], xA)
 
     return n_sil, n_met
 

@@ -26,9 +26,11 @@ The magma ocean covers the "metal pond" before the next impactor arrives.
 
 # ----- [ initial condition ] -----
 rpl     = 1000e3   # initial embryo size (radius in m)
-f_core  = 0.08      # fraction of core mass
+f_core  = 0.12     # fraction of core mass
 
-melt_factor = 16.  # melt volume produced upon impact = melt_factor * vol_impactor
+melt_factor = 24.  # melt volume produced upon impact = melt_factor * vol_impactor
+
+fe_ratio = 0.55    # ration of metal iron to total iron
 
 ''' composition '''
 # set initial composition in wt% 
@@ -36,7 +38,7 @@ melt_factor = 16.  # melt volume produced upon impact = melt_factor * vol_impact
 # -> and convert to molar
 
 # 2015 init Conditions
-fe_mantle, fe_core = chem_mass_fe(f_core, 0.55, 0.1866)
+fe_mantle, fe_core = chem_mass_fe(f_core, fe_ratio, 0.1866)
 ni_mantle, ni_core = chem_mass_ni(0.05, f_core, 0.01091)
 
 xinit_mantle     = np.array([0.0954e2, 0.0102e2, 0.1070e2, 60.6e-4, 2623e-4, fe_mantle, 0.000513e2, ni_mantle, 18.3e-7, 345e-7])
@@ -141,7 +143,13 @@ while (1):
 
     
     # solve for the partitioning of minor elements
-    n_sil, n_met = partition_minor(n_sil, n_met, T_eq, P_eq) 
+    n_sil, n_met = partition_minor(n_sil, n_met, T_eq, P_eq)
+
+    # solve for the segregation between FeO
+    n_sil_new, n_new_met = seg_fe_phase(n_met,n_sil, T_eq, P_eq)
+
+    print("Impact: ", n_sil_new[nFe] - n_sil[nFe], n_new_met[nFe] - n_met[nFe])
+
     D = convert_D(n_sil, n_met)
     l_DSi = np.append(l_DSi, D[nSi])
 
@@ -152,7 +160,7 @@ while (1):
     xFeO  = n_sil[nFe]/np.sum(n_sil[nMg:])
     xSiO2 = n_sil[nSi]/np.sum(n_sil[nMg:])
     
-    print(count, "\t Fe ratio: ", n_met[nFe]/n_delivered[nFe], "\t Si: ", n_met[nSi]/n_delivered[nSi], " \t org: " , n_MO[nFe]/n_MO[nSi], "\t", calc_KdSi(T_eq, P_eq), "  calc:", xSi*xFeO*xFeO/xSiO2/xFe/xFe)
+    #print(count, "\t Fe ratio: ", n_met[nFe]/n_delivered[nFe], "\t Si: ", n_met[nSi]/n_delivered[nSi], " \t org: " , n_MO[nFe]/n_MO[nSi], "\t", calc_KdSi(T_eq, P_eq), "  calc:", xSi*xFeO*xFeO/xSiO2/xFe/xFe)
         
     
     ''' atmosphere interaction '''
@@ -238,7 +246,7 @@ sum_of_squares = ((wt_mantle[-1:, nV ] - 113e-6)**2 / 113e-6) +\
                  ((wt_mantle[-1:, nTa] - 36e-9)**2 / 36e-9) +\
                  ((wt_mantle[-1:, nNb] - 675e-9)**2 / 675e-9)
 
-print("Error Value: ", sum_of_squares)
+print("Error Value: ", sum_of_squares * 1e4)
 
 # oxygen fugacity
 ax[3].set(ylabel="Oxygen fugacity [$\Delta$IW]")
