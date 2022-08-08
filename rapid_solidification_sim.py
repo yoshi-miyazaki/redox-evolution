@@ -120,8 +120,11 @@ def simulation(f_core = .12, melt_factor = 24., fe_ratio = .55, h_frac = 0):
 
         # solve for the partitioning of minor elements
         n_sil, n_met = partition_minor(n_sil, n_met, T_eq, P_eq)
-        D = convert_D(n_sil, n_met)
-        l_DSi = np.append(l_DSi, D[nSi])
+
+        # solve for the segregation between FeO
+        n_sil_new, n_met_new = seg_fe_phase(n_met, n_sil, T_eq, P_eq)
+
+        n_sil, n_met = n_sil_new, n_met_new
 
         ''' why? '''
         dn = n_delivered - n_met
@@ -203,18 +206,22 @@ print(simulation())
 
 best_score = 1000
 best_h_frac = 0
+best_melt_factor = 0
 
-for i in range(0,100):
-    h_frac = i/100
-    score = simulation(.12,24, .55, h_frac,) * 1e4
-    print("H_FRAC: ", h_frac)
-    print("score = ", score, "\n ------------------------ \n")
-    if (score < best_score):
-        best_score = score
-        best_h_frac = h_frac
+for i in range(0, 100):
+    for j in range(0,120):
+        h_frac = i/100.
+        score = simulation(.12,j,.55,i)
+        print("Melt Factor, H_frac = ", j, h_frac)
+        print("score = ", score)
+        if (score < best_score):
+            best_score = score
+            best_h_frac = h_frac
+            best_melt_factor = j
 
 print("Best Score", best_score)
-print("Best Melt Factor", best_h_frac)
+print("Best Melt Factor", best_melt_factor)
+print("Best h_frac", best_h_frac)
 
 
 

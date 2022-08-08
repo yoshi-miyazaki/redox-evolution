@@ -146,9 +146,11 @@ while (1):
     n_sil, n_met = partition_minor(n_sil, n_met, T_eq, P_eq)
 
     # solve for the segregation between FeO
-    n_sil_new, n_new_met = seg_fe_phase(n_met,n_sil, T_eq, P_eq)
+    n_sil_new, n_met_new = seg_fe_phase(n_met,n_sil, T_eq, P_eq)
 
-    print("Impact: ", n_sil_new[nFe] - n_sil[nFe], n_new_met[nFe] - n_met[nFe])
+    n_sil, n_met = n_sil_new, n_met_new
+
+    #print("Impact: ", n_sil_new[nFe] - n_sil[nFe], n_new_met[nFe] - n_met[nFe])
 
     D = convert_D(n_sil, n_met)
     l_DSi = np.append(l_DSi, D[nSi])
