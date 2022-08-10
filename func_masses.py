@@ -12,31 +12,34 @@ def body_mass(r_body, core_radius):
 def shell_mass(rho, r_planet, depth):
     return rho * 4./3*math.pi * (r_planet**3 - (r_planet - depth)**3)
 
-# takes percent of core, proportion of iron in core/mantle, and total percent
-# returns fe of iron in core and mantle
+
+# takes core mass ratio, proportion of iron in core/mantle, and total percent
+# returns wt% of Fe in the core and mantle
 def chem_mass_fe(r, p, t):
     fe_mantle = t * (1 - p) / (1 - r) * 100
     fe_core   = t * p / r * 100
-    print("Iron Mantle, Iron Core: ", fe_mantle, fe_core)
+    print("Iron mantle, Iron core: ", fe_mantle, fe_core, " wt%")
     if (fe_mantle < 0 or fe_core < 0):
-        print("Error: iron less than 0%")
+        print("func_masses -- Error: Fe wt% less than 0%")
         sys.exit()
     elif (fe_mantle > 100 or fe_core > 100):
-        print("Error: iron more than 100%")
+        print("func_masses -- Error: Fe wt% more than 100%", fe_mantle, fe_core)
         sys.exit()
     return fe_mantle, fe_core
 
 def chem_mass_ni(ni_core, r, t):
     ni_mantle = (t - ni_core * r) / (1 - r) * 100
     ni_core *= 100
-    print("Nickel Mantle, Nickel Core: ", ni_mantle, ni_core)
+    
+    print("Nickel Mantle, Nickel Core: ", ni_mantle, ni_core, " wt%")
     if (ni_mantle < 0 or ni_core < 0):
-        print("Error: nickel less than 0%")
+        print("func_masses -- Error: Ni wt% less than 0%")
         sys.exit()
     elif (ni_mantle > 100 or ni_core > 100):
-        print("Error: nickel more than 100%")
+        print("func_masses -- Error: Ni wt% more than 100%")
         sys.exit()
     return ni_mantle, ni_core
+
 
 # calculate core radius, assuming the core mass is `frac_core` of the impactor
 def core_radius(rpl, f_core):

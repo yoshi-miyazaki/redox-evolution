@@ -28,22 +28,20 @@ The magma ocean covers the "metal pond" before the next impactor arrives.
 rpl     = 1000e3   # initial embryo size (radius in m)
 f_core  = 0.12     # fraction of core mass
 
-melt_factor = 24.  # melt volume produced upon impact = melt_factor * vol_impactor
+melt_factor = 30.  # melt volume produced upon impact = melt_factor * vol_impactor
 
-fe_ratio = 0.55    # ration of metal iron to total iron
+fe_ratio = 0.45    # ration of metal iron to total iron
 
 ''' composition '''
-# set initial composition in wt% 
-# (in the order of MgO, Al2O3, SiO2, V2O3, CrO, FeO, CoO, NiO, TaO2, NbO)
-# -> and convert to molar
-
-# 2015 init Conditions
+# calc Fe wt% in the core/mantle based on the init conditions by Rubie et al. (2015)
 fe_mantle, fe_core = chem_mass_fe(f_core, fe_ratio, 0.1866)
 ni_mantle, ni_core = chem_mass_ni(0.05, f_core, 0.01091)
 
+# set initial composition in wt% 
+# (in the order of MgO, Al2O3, SiO2, V2O3, CrO, FeO, CoO, NiO, TaO2, NbO)
+# -> and convert to molar
 xinit_mantle     = np.array([0.0954e2, 0.0102e2, 0.1070e2, 60.6e-4, 2623e-4, fe_mantle, 0.000513e2, ni_mantle, 18.3e-7, 345e-7])
 # xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0., 6.6e-6, 8.55e-5])
-#xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0.])
 
 # set core composition in wt%
 # (in the order of Fe, Ni)
@@ -57,30 +55,29 @@ d_mantle = rpl - rc         # mantle depth
 M_mantle = shell_mass(rhom, rpl, d_mantle) # calculate mass of initial planetesimal's mantle
 M_core   = shell_mass(rhoc, rc, rc)
 
-
 ''' composition '''
 # calc the molar composition of mantle per 1 kg
-mole_mantle_unit = set_initial_mantle_composition(xinit_mantle)
+mole_mantle_unit = set_initial_mantle_composition_from_element(xinit_mantle)
 n_mantle         = M_mantle * mole_mantle_unit     # convert mass to molar amount
+
 
 # calc the molar composition of core per 1 kg
 mole_core_unit   = set_initial_core_composition(xinit_core)
 n_core           = M_core * mole_core_unit          # convert mass to molar amount
 print("Fe in metal: ", n_core[nFe]/(n_mantle[nFe]+n_core[nFe]))
 
-# physical
+# save results
 l_rpl, l_dm, l_Peq, l_Teq, l_DSi, l_fO2 = np.array([]), np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
 l_sil, l_met = n_mantle, n_core
 l_Mm,  l_Mc  = M_mantle, M_core
 
 
-# solve for growth:
+''' solve for growth '''
 # -- growing the planetesimal to a planetary embryo
 count = 0
 while (1):
     count += 1
     l_rpl = np.append(l_rpl, rpl)
-    #print(count)
     
     if (rpl >= 6000e3 or count > 1000):
         l_Teq = np.append(l_Teq, l_Teq[-1])
@@ -136,20 +133,18 @@ while (1):
     P_eq = Peq(g_acc, h)
     T_eq = Teq(P_eq * 1e9)  # pressure needs to be in Pa
 
+    
     # solve for the partitioning of major elements using KD and mass balance
     # -- mole_sil: mole amount in silicate    of MO + impactor
     #    mole_met:             in metal phase of MO + impactor after equilibrium
     n_sil, n_met = partition_MO_impactor(n_partition, T_eq, P_eq)
-
     
     # solve for the partitioning of minor elements
     n_sil, n_met = partition_minor(n_sil, n_met, T_eq, P_eq)
 
     # solve for the segregation between FeO
-    n_sil_new, n_met_new = seg_fe_phase(n_met,n_sil, T_eq, P_eq)
-
-    n_sil, n_met = n_sil_new, n_met_new
-
+    #n_sil, n_met = seg_fe_phase(n_met,n_sil, T_eq, P_eq)
+    
     #print("Impact: ", n_sil_new[nFe] - n_sil[nFe], n_new_met[nFe] - n_met[nFe])
 
     D = convert_D(n_sil, n_met)
@@ -162,7 +157,7 @@ while (1):
     xFeO  = n_sil[nFe]/np.sum(n_sil[nMg:])
     xSiO2 = n_sil[nSi]/np.sum(n_sil[nMg:])
     
-    #print(count, "\t Fe ratio: ", n_met[nFe]/n_delivered[nFe], "\t Si: ", n_met[nSi]/n_delivered[nSi], " \t org: " , n_MO[nFe]/n_MO[nSi], "\t", calc_KdSi(T_eq, P_eq), "  calc:", xSi*xFeO*xFeO/xSiO2/xFe/xFe)
+    print(count, "\t Fe ratio: ", n_met[nFe]/n_delivered[nFe], "\t Si: ", n_met[nSi]/n_delivered[nSi], " \t org: " , n_MO[nFe]/n_MO[nSi], "\t", calc_KdSi(T_eq, P_eq), "  calc:", xSi*xFeO*xFeO/xSiO2/xFe/xFe)
         
     
     ''' atmosphere interaction '''
@@ -177,9 +172,7 @@ while (1):
     l_fO2 = np.append(l_fO2, fO2_now)
     
     #if (0):
-
-
-        
+    
 
     ''' update mantle & core compositions '''
     # add moles in metal phase to total moles of each element in the melt pond (which eventually sinks down into the planetary core)

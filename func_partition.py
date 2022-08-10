@@ -70,18 +70,16 @@ def partition_MO_impactor(molep, T_eq, P_eq):
     # x0, x1 represents the mole of Fe in the metal phase
     # considering the reaction, 
     x0 = tot_Fe * 0.001
-    x1 = tot_Fe - (molep[nO] - molep[nMg] - molep[nAl] * 1.5 - molep[nSi] * 2 - molep[nNi] - molep[nCo] - molep[nCr])
-
+    x1 = (tot_Fe - (molep[nO] - molep[nMg] - molep[nAl] * 1.5 - molep[nSi] * 2 - molep[nNi] - molep[nCo] - molep[nCr]))*1.
+    xL = x1*1.
+    
     f0 = df(x0, molep, Kd_Ni, Kd_Si, Kd_Cr)
     f1 = df(x1, molep, Kd_Ni, Kd_Si, Kd_Cr)
-
 
     if (f0 * f1 > 0):
         xA = (x0 + x1) * .5
         fA = df(xA, molep, Kd_Ni, Kd_Si, Kd_Cr)
-        print("partition.py: bisection range error: ", x0, x1, "\t", f0, f1, "\t", fA)
-
-        sys.exit()
+        print("partition.py: bisection range error *: ", x0, x1, "\t", f0, f1, "\t", fA)
 
     eps = 1e-8
     while (np.abs(f1 - f0) > eps):
@@ -101,8 +99,7 @@ def partition_MO_impactor(molep, T_eq, P_eq):
         if (i not in list_major):
             mole_sil[i] = molep[i]
 
-    # print(mole_sil+mole_met-molep)
-    # sys.exit()
+    # print("r ", x1/xL, x1, xL)
 
     return mole_sil, mole_met
 
@@ -229,25 +226,26 @@ def partition_minor(n_sil, n_met, T_eq, P_eq):
         tot_el = n_sil[i] + n_met[i]
 
         if (i==nV):
-            Kd_el, df_el = Kd_V,  df_V
+            Kd_el, df_el, nO = Kd_V,  df_V,  1.5
         elif (i==nCo):
-            Kd_el, df_el = Kd_Co, df_Co
+            Kd_el, df_el, nO = Kd_Co, df_Co, 1.
         elif (i==nTa):
-            Kd_el, df_el = Kd_Ta, df_Ta
+            Kd_el, df_el, nO = Kd_Ta, df_Ta, 2.5
         elif (i==nNb):
-            Kd_el, df_el = Kd_Nb, df_Nb
+            Kd_el, df_el, nO = Kd_Nb, df_Nb, 2.5
             
         found_met_el = bisection_search_minor(tot_el, met_Fe, sil_Fe, tot_met, tot_sil, Kd_el, df_el)
         n_met[i] = found_met_el
         n_sil[i] = tot_el - found_met_el
 
+        n_met[nFe] -= found_met_el * nO
+        n_sil[nFe] += found_met_el * nO
 
     return n_sil, n_met
 
-
 def bisection_search_minor(tot_El, met_Fe, sil_Fe, tot_met, tot_sil, Kd_El, df_El):
     # determine the search range
-    x0 = tot_El * 0.0001
+    x0 = tot_El * 0.001
     f0 = df_El(x0, tot_El, met_Fe, sil_Fe, tot_met, tot_sil, Kd_El)
 
     x1 = el_met_max(x0, tot_El, met_Fe, sil_Fe, tot_met, tot_sil, Kd_El, df_El)
@@ -275,9 +273,13 @@ def el_met_max(x0, tot_El, met_Fe, sil_Fe, tot_met, tot_sil, Kd_El, df_El):
     f0 = df_El(x0, tot_El, met_Fe, sil_Fe, tot_met, tot_sil, Kd_El)
 
     x1, f1 = tot_El, f0
+    f1 = df_El(x1*0.999, tot_El, met_Fe, sil_Fe, tot_met, tot_sil, Kd_El)
+    
     while (f0 * f1 > 0):
         x1 *= 0.9
         f1 = df_El(x1, tot_El, met_Fe, sil_Fe, tot_met, tot_sil, Kd_El)
+
+    #print(x1, f1, "\t", f0)
 
     return x1
 
@@ -394,11 +396,26 @@ def seg_fe_phase(n_met, n_sil, T_eq, P_eq):
     x0 = 1e-8
     f0 = df_FeO(x0, FeO, FeO_onehalf, tot_sil, Kd_FeO)
 
-    x1 = sil_Fe + 1e23
+    x1 = sil_Fe #+ 1e23
     f1 = df_FeO(x1, FeO, FeO_onehalf, tot_sil, Kd_FeO)
 
     if (f0 * f1 > 0):
         print("Partition Iron Segregation Bisection Error, same sign ", f0, f1)
+        print(n_sil)
+
+        sil_Fe = n_sil[nFe]
+        sil_Mg = n_sil[nMg]
+        sil_Si = n_sil[nSi]
+        sil_Ni = n_sil[nNi]
+        sil_Al = n_sil[nAl]
+        sil_Cr = n_sil[nCr]
+        sil_Co = n_sil[nCo]
+        sil_O  = n_sil[nO]
+
+        print(sil_O - sil_Co - sil_Cr - sil_Si*2 - sil_Ni - sil_Al*1.5  - sil_Mg)
+        print(sil_Fe)
+        
+        exit()
 
     eps = 1e-6
 
