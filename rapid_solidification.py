@@ -28,7 +28,7 @@ The magma ocean covers the "metal pond" before the next impactor arrives.
 rpl     = 1000e3   # initial embryo size (radius in m)
 f_core  = 0.12     # fraction of core mass
 
-melt_factor = 30.  # melt volume produced upon impact = melt_factor * vol_impactor
+melt_factor = 24.  # melt volume produced upon impact = melt_factor * vol_impactor
 
 fe_ratio = 0.45    # ration of metal iron to total iron
 
@@ -233,6 +233,8 @@ ax[2].plot(l_rpl/1e3, wt_mantle[:,nCo]*1e6 -  200, color="b", linestyle=":")  # 
 ax[2].plot(l_rpl/1e3, wt_mantle[:,nCr]*1e6 - 4500, color="g", linestyle=":")  # Cr pp? in the mantle (pattern, half value)
 ax[2].plot(l_rpl/1e3, wt_mantle[:,nTa]*1e9 -   36, color="b", linestyle="-")  # Ta ppb in the mantle (forced match, pattern)
 ax[2].plot(l_rpl/1e3, wt_mantle[:,nNb]*1e9 -  675, color="g", linestyle="-")  # Nb ppm in the mantle (forced match, pattern)
+
+ax[2].set_ylim([-200,200])
 
 sum_of_squares = ((wt_mantle[-1:, nV ] - 113e-6)**2 / 113e-6) +\
                  ((wt_mantle[-1:, nNi] - 3000e-6)**2 / 3000e-6) +\

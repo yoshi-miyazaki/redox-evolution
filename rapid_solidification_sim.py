@@ -27,7 +27,7 @@ The magma ocean covers the "metal pond" before the next impactor arrives.
 # GLOBAL VARIABLEs
 
 
-def simulation(f_core = .12, melt_factor = 24., fe_ratio = .55, h_frac = 0):
+def simulation(iron_seg = False, f_core = .12, melt_factor = 30., fe_ratio = .45, h_frac = 0):
     # ----- [ initial condition ] -----
 
     rpl = 1000e3  # initial embryo size (radius in m)
@@ -49,7 +49,7 @@ def simulation(f_core = .12, melt_factor = 24., fe_ratio = .55, h_frac = 0):
 
     ''' composition '''
     # calc the molar composition of mantle per 1 kg
-    mole_mantle_unit = set_initial_mantle_composition(xinit_mantle)
+    mole_mantle_unit = set_initial_mantle_composition_from_element(xinit_mantle)
     n_mantle = M_mantle * mole_mantle_unit  # convert mass to molar amount
 
     # calc the molar composition of core per 1 kg
@@ -122,9 +122,14 @@ def simulation(f_core = .12, melt_factor = 24., fe_ratio = .55, h_frac = 0):
         n_sil, n_met = partition_minor(n_sil, n_met, T_eq, P_eq)
 
         # solve for the segregation between FeO
-        n_sil_new, n_met_new = seg_fe_phase(n_met, n_sil, T_eq, P_eq)
+        if(iron_seg):
 
-        n_sil, n_met = n_sil_new, n_met_new
+            n_sil_new, n_met_new = seg_fe_phase(n_met, n_sil, T_eq, P_eq)
+
+            n_sil, n_met = n_sil_new, n_met_new
+
+        D = convert_D(n_sil, n_met)
+        l_DSi = np.append(l_DSi, D[nSi])
 
         ''' why? '''
         dn = n_delivered - n_met
@@ -200,28 +205,26 @@ def simulation(f_core = .12, melt_factor = 24., fe_ratio = .55, h_frac = 0):
 
     print("Oxygen Fugacity: ", l_fO2[-1:], "\n")
 
+    #return(sum_of_squares)
     return(sum_of_squares)
 
-print(simulation())
 
 best_score = 1000
 best_h_frac = 0
 best_melt_factor = 0
 
-for i in range(0, 100):
-    for j in range(0,120):
-        h_frac = i/100.
-        score = simulation(.12,j,.55,i)
-        print("Melt Factor, H_frac = ", j, h_frac)
-        print("score = ", score)
-        if (score < best_score):
-            best_score = score
-            best_h_frac = h_frac
-            best_melt_factor = j
+for j in range(0,110):
+    score = simulation(False, .12,j,.45)
+    #print("Percent Err: ", (score2 - score)/score * 100)
+    print("Melt Factor", j)
+    print("score = ", score)
+    if (score < best_score):
+        best_score = score
+        best_melt_factor = j
 
 print("Best Score", best_score)
 print("Best Melt Factor", best_melt_factor)
-print("Best h_frac", best_h_frac)
+#print("Best h_frac", best_h_frac)
 
 
 
