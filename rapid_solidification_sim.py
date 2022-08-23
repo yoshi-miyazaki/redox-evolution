@@ -9,7 +9,7 @@ import matplotlib.pyplot       as plt
 from   matplotlib              import rc
 from   matplotlib.font_manager import FontProperties
 from   matplotlib.ticker       import MultipleLocator, FormatStrFormatter
-
+import multiprocessing as mp
 plt.rcParams['font.family']='sans-serif'
 plt.rcParams['axes.linewidth']= 1.0
 plt.rcParams['font.size']     = 14
@@ -22,18 +22,23 @@ rc('text.latex', preamble=r'\usepackage{sfmath}')
 """
 This file models the redox evolution during planet growth.
 The magma ocean covers the "metal pond" before the next impactor arrives.
+
+It models the rapid_solidification.py file into it's own function to 
+change multiple variables and simulations
 """
 
-# GLOBAL VARIABLEs
+# GLOBAL VARIABLES
 
 
-def simulation(iron_seg = False, f_core = .12, melt_factor = 30., fe_ratio = .45, h_frac = 0):
+def simulation(ni_mantle_per = 0.05, iron_seg = False, f_core = .12, melt_factor = 30., fe_ratio = .45, h_frac = 0.):
     # ----- [ initial condition ] -----
 
     rpl = 1000e3  # initial embryo size (radius in m)
 
+    ''' composition '''
+    # calc Fe wt% in the core/mantle based on the init conditions by Rubie et al. (2015)
     fe_mantle, fe_core = chem_mass_fe(f_core, fe_ratio, 0.1866)
-    ni_mantle, ni_core = chem_mass_ni(0.05, f_core, 0.01091)
+    ni_mantle, ni_core = chem_mass_ni(ni_mantle_per, f_core, 0.01091)
 
     xinit_mantle = np.array(
         [0.0954e2, 0.0102e2, 0.1070e2, 60.6e-4, 2623e-4, fe_mantle, 0.000513e2, ni_mantle, 18.3e-7, 345e-7])
@@ -42,39 +47,37 @@ def simulation(iron_seg = False, f_core = .12, melt_factor = 30., fe_ratio = .45
 
     # ----- [ code ] -----
     ''' mass '''
-    rc = core_radius(rpl, f_core)
+    rc       = core_radius(rpl, f_core)
     d_mantle = rpl - rc  # mantle depth
     M_mantle = shell_mass(rhom, rpl, d_mantle)  # calculate mass of initial planetesimal's mantle
-    M_core = shell_mass(rhoc, rc, rc)
+    M_core   = shell_mass(rhoc, rc, rc)
 
     ''' composition '''
     # calc the molar composition of mantle per 1 kg
     mole_mantle_unit = set_initial_mantle_composition_from_element(xinit_mantle)
-    n_mantle = M_mantle * mole_mantle_unit  # convert mass to molar amount
+    n_mantle         = M_mantle * mole_mantle_unit  # convert mass to molar amount
 
     # calc the molar composition of core per 1 kg
-    mole_core_unit = set_initial_core_composition(xinit_core)
-    n_core = M_core * mole_core_unit  # convert mass to molar amount
-    print("Fe in metal: ", n_core[nFe] / (n_mantle[nFe] + n_core[nFe]))
+    mole_core_unit   = set_initial_core_composition(xinit_core)
+    n_core           = M_core * mole_core_unit  # convert mass to molar amount
+    #print("Fe in metal: ", n_core[nFe] / (n_mantle[nFe] + n_core[nFe]))
 
-    # physical
-    l_rpl, l_dm, l_Peq, l_Teq, l_DSi, l_fO2 = np.array([]), np.array([]), np.array([]), np.array([]), np.array(
-        []), np.array([])
+    # save results
+    l_rpl, l_dm, l_Peq, l_Teq, l_DSi, l_fO2 = np.array([]), np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
     l_sil, l_met = n_mantle, n_core
     l_Mm, l_Mc = M_mantle, M_core
 
-    # solve for growth:
+    ''' solve for growth '''
     # -- growing the planetesimal to a planetary embryo
     count = 0
     while (1):
         count += 1
         l_rpl = np.append(l_rpl, rpl)
-        # print(count)
 
         if (rpl >= 6000e3 or count > 1000):
             l_Teq = np.append(l_Teq, l_Teq[-1])
             l_Peq = np.append(l_Peq, l_Peq[-1])
-            print(rpl)
+            #print(rpl)
             break
 
         ''' 
@@ -199,32 +202,172 @@ def simulation(iron_seg = False, f_core = .12, melt_factor = 30., fe_ratio = .45
                      ((wt_mantle[-1:, nCo] - 200e-6) ** 2 / 200e-6) + \
                      ((wt_mantle[-1:, nCr] - 4500e-6) ** 2 / 4500e-6) + \
                      ((wt_mantle[-1:, nTa] - 36e-9) ** 2 / 36e-9) + \
-                     ((wt_mantle[-1:, nNb] - 675e-9) ** 2 / 675e-9)
+                     ((wt_mantle[-1:, nNb] - 675e-9) ** 2 / 675e-9) + \
+                     ((wtFeO[-1] - 0.18) ** 2 / 0.18) + \
+                     ((wtSiO2[-1] - 0.43) ** 2 / 0.43)
 
-    print("Error Value: ", sum_of_squares * 1e4)
+    #print("Error Value: ", sum_of_squares * 1e4)
 
-    print("Oxygen Fugacity: ", l_fO2[-1:], "\n")
+    #print("Oxygen Fugacity: ", l_fO2[-1:], "\n")
 
     #return(sum_of_squares)
-    return(sum_of_squares)
+    return(sum_of_squares * 1e4)
 
+def rgb_to_hex(rgb):
+    return '#' + ( '%02x%02x%02x' % rgb )
 
-best_score = 1000
-best_h_frac = 0
-best_melt_factor = 0
+'''
+This Test is tailored towards two components.
+1. The nickel percent in the core
+2. The melt factor
+It aims to minimize the error as it simulates 
+between the different combined amounts
+'''
+def test1(connection):
+    best_score = 1000000
+    best_melt_factor = 0
+    best_per = 0.
 
-for j in range(0,110):
-    score = simulation(False, .12,j,.45)
-    #print("Percent Err: ", (score2 - score)/score * 100)
-    print("Melt Factor", j)
-    print("score = ", score)
-    if (score < best_score):
-        best_score = score
-        best_melt_factor = j
+    best_ni_score = 100000
+    best_ni_melt_factor = 10
+    best_ni_per = 0.
 
-print("Best Score", best_score)
-print("Best Melt Factor", best_melt_factor)
-#print("Best h_frac", best_h_frac)
+    bmf = []
+
+    ni_mf_scores = np.zeros((11, 100))
+
+    for i in range(1, 10):
+        ni_per = i / 100.
+        print("Test 1 running", (i-1)/10. * 100, "% | Ni_percent =", ni_per)
+        for j in range(10, 110):
+
+            score = simulation(ni_per, False, .12, j, .45)
+            ni_mf_scores[i, j - 10] = score
+            if (score < best_score):
+                best_score = score
+                best_melt_factor = j
+                best_per = ni_per
+        bmf.append(best_melt_factor)
+        if (best_score < best_ni_score):
+            best_ni_score = best_score
+            best_ni_per = best_per
+            best_ni_melt_factor = best_melt_factor
+
+    print("Best Score", best_ni_score)
+    print("Best Melt Factor", best_ni_melt_factor)
+    print("Best Ni Core per", best_ni_per)
+    print(bmf)
+    connection.send(ni_mf_scores)
+    return ni_mf_scores
+
+'''
+Test2 is focused on h_frac and it's effects on the score relative to 
+a changing melt factor. We want to see if h_frac has any strong effect on the score.
+'''
+def test2(connection):
+    best_score = 10000
+    best_melt_frac = 10
+    hf_mf_scores = np.zeros((50, 100))
+    for i in range(1,25):
+        h_frac = i * 4. / 100.
+        print("Test 2 running", round((i-1) / 24. * 100, 1), "% | h_frac = ", h_frac)
+        for j in range(10, 110):
+            score = simulation(0.05, False, 0.12, j, .45, h_frac)
+            hf_mf_scores[i, j -10] = score
+    connection.send(hf_mf_scores)
+    return hf_mf_scores
+
+def test3(connection):
+    fe_per_mf_scores = np.zeros((23, 100))
+    for i in range(9, 22):
+        fe_core = i/100.
+        print("Test 3 running", round((i - 9) /12. *100, 1), "% | fe_core = ", fe_core)
+        for j in range(10, 110):
+            score = simulation(0.05, False, fe_core, j)
+            fe_per_mf_scores[i, j-10] = score
+    connection.send(fe_per_mf_scores)
+    return fe_per_mf_scores
+
+def test4(connection):
+    fe_per_score= np.zeros((23, 30, 3))
+    for i in range(9, 22):
+        fe_core = i / 100.
+        print("Test 4 running", round((i - 9) / 12. * 100, 1), "% | fe_core = ", fe_core)
+        for j in range(0, 30):
+            fe_raw = simulation(0.05, False, fe_core, j)
+            fe_seg = simulation(0.05, True, fe_core, j)
+            fe_per_score[i, j] = [fe_raw, fe_seg, fe_seg - fe_raw]
+    connection.send(fe_per_score)
+    return fe_per_score
+
+fig, ax = plt.subplots(1,4)
+ax[0].set(ylabel="Sim Score (SOQ)")
+ax[1].set(ylabel="Sim Score (SOQ)")
+ax[2].set(ylabel="Sim Score (SOQ)")
+ax[3].set(ylabel="Diff. Scores")
+
+ax[0].set(xlabel="Altering Nickel in Core")
+ax[1].set(xlabel="Altering h_frac")
+ax[2].set(xlabel="Altering fe prop in Core")
+ax[3].set(xlabel="Difference with Alterated - Regular")
+
+plt.tight_layout()
+
+if __name__ == "__main__":
+
+    test_1_data, test_1_proc = mp.Pipe()
+    test_2_data, test_2_proc = mp.Pipe()
+    test_3_data, test_3_proc = mp.Pipe()
+    test_4_data, test_4_proc = mp.Pipe()
+
+    run1 = mp.Process(target= test1, args=(test_1_proc,))
+    run2 = mp.Process(target= test2, args=(test_2_proc,))
+    run3 = mp.Process(target= test3, args=(test_3_proc,))
+    run4 = mp.Process(target= test4, args=(test_4_proc,))
+
+    run1.start()
+    run2.start()
+    run3.start()
+    run4.start()
+
+    data4 = test_4_data.recv()
+    print("> > > Received Test 4 results")
+    color = (220, 220, 220)
+    for i in range(9, 22):
+        (a,b,c) = color
+        color = (a-8, b -8, c-8)
+        ax[3].plot(range(0, 30),data4[i, :, 2], color=rgb_to_hex(color), linestyle="-" )
+    plt.savefig("./sim.pdf")
+
+    data1 = test_1_data.recv()
+    print("> > > Received Test 1 Results")
+    color = (220, 220, 220)
+    for i in range(1, 10):
+        (a, b, c) = color
+        color = (a - 20, b - 20, c - 20)
+        ax[0].plot(range(10, 110), data1[i, :], color=rgb_to_hex(color), linestyle="-")
+    ax[0].set_ylim([300, 1200])
+    plt.savefig("./sim.pdf")
+
+    data3 = test_3_data.recv()
+    print("> > > Received Test 3 Results")
+    color = (220,220,220)
+    for i in range(9, 22):
+        (a, b, c) = color
+        color = (a - 16, b - 16, c - 16)
+        ax[2].plot(range(10,110), data3[i,:], color=rgb_to_hex(color), linestyle="-")
+    ax[2].set_ylim([300, 1200])
+    plt.savefig("./sim.pdf")
+
+    data2 = test_2_data.recv()
+    print("> > > Received Test 2 Results")
+    color = (200, 200, 200)
+    for i in range(1,25):
+        (a,b,c) = color
+        color = (a - 5, b - 5, c- 5)
+        ax[1].plot(range(10, 110), data2[i, :], color=rgb_to_hex(color), linestyle="-")
+    ax[1].set_ylim([300, 1200])
+    plt.savefig("./sim.pdf")
 
 
 
