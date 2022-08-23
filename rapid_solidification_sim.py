@@ -13,11 +13,12 @@ import multiprocessing as mp
 plt.rcParams['font.family']='sans-serif'
 plt.rcParams['axes.linewidth']= 1.0
 plt.rcParams['font.size']     = 14
-plt.rcParams['figure.figsize']= 4*1.414*4, 4*1
+plt.rcParams['figure.figsize']= 4*1.414*4, 4*2
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text',usetex=True)
 rc('text.latex', preamble=r'\usepackage{sfmath}')
 
+# Final core/mass ratio
 
 """
 This file models the redox evolution during planet growth.
@@ -30,7 +31,7 @@ change multiple variables and simulations
 # GLOBAL VARIABLES
 
 
-def simulation(ni_mantle_per = 0.05, iron_seg = False, f_core = .12, melt_factor = 30., fe_ratio = .45, h_frac = 0.):
+def simulation(ni_mantle_per = 0.05, iron_seg = False, f_core = .12, melt_factor = 30., fe_ratio = .55, h_frac = 0.):
     # ----- [ initial condition ] -----
 
     rpl = 1000e3  # initial embryo size (radius in m)
@@ -41,7 +42,7 @@ def simulation(ni_mantle_per = 0.05, iron_seg = False, f_core = .12, melt_factor
     ni_mantle, ni_core = chem_mass_ni(ni_mantle_per, f_core, 0.01091)
 
     xinit_mantle = np.array(
-        [0.0954e2, 0.0102e2, 0.1070e2, 60.6e-4, 2623e-4, fe_mantle, 0.000513e2, ni_mantle, 18.3e-7, 345e-7])
+        [0.0954e2, 0.0102e2, 0.1070e2, 60.6e-4, 2623e-4, fe_mantle, 0.000513e2, ni_mantle, 345e-7, 18.3e-7])
 
     xinit_core = np.array([fe_core, ni_core])
 
@@ -126,10 +127,8 @@ def simulation(ni_mantle_per = 0.05, iron_seg = False, f_core = .12, melt_factor
 
         # solve for the segregation between FeO
         if(iron_seg):
-
-            n_sil_new, n_met_new = seg_fe_phase(n_met, n_sil, T_eq, P_eq)
-
-            n_sil, n_met = n_sil_new, n_met_new
+            for i in range(1):
+                n_sil, n_met = seg_fe_phase(n_met, n_sil, T_eq, P_eq)
 
         D = convert_D(n_sil, n_met)
         l_DSi = np.append(l_DSi, D[nSi])
@@ -211,7 +210,8 @@ def simulation(ni_mantle_per = 0.05, iron_seg = False, f_core = .12, melt_factor
     #print("Oxygen Fugacity: ", l_fO2[-1:], "\n")
 
     #return(sum_of_squares)
-    return(sum_of_squares * 1e4)
+
+    return sum_of_squares * 1e4, l_fO2[-1:]
 
 def rgb_to_hex(rgb):
     return '#' + ( '%02x%02x%02x' % rgb )
@@ -224,16 +224,6 @@ It aims to minimize the error as it simulates
 between the different combined amounts
 '''
 def test1(connection):
-    best_score = 1000000
-    best_melt_factor = 0
-    best_per = 0.
-
-    best_ni_score = 100000
-    best_ni_melt_factor = 10
-    best_ni_per = 0.
-
-    bmf = []
-
     ni_mf_scores = np.zeros((11, 100))
 
     for i in range(1, 10):
@@ -241,22 +231,9 @@ def test1(connection):
         print("Test 1 running", (i-1)/10. * 100, "% | Ni_percent =", ni_per)
         for j in range(10, 110):
 
-            score = simulation(ni_per, False, .12, j, .45)
+            score, _ = simulation(ni_per, False, .12, j, .45)
             ni_mf_scores[i, j - 10] = score
-            if (score < best_score):
-                best_score = score
-                best_melt_factor = j
-                best_per = ni_per
-        bmf.append(best_melt_factor)
-        if (best_score < best_ni_score):
-            best_ni_score = best_score
-            best_ni_per = best_per
-            best_ni_melt_factor = best_melt_factor
 
-    print("Best Score", best_ni_score)
-    print("Best Melt Factor", best_ni_melt_factor)
-    print("Best Ni Core per", best_ni_per)
-    print(bmf)
     connection.send(ni_mf_scores)
     return ni_mf_scores
 
@@ -265,109 +242,159 @@ Test2 is focused on h_frac and it's effects on the score relative to
 a changing melt factor. We want to see if h_frac has any strong effect on the score.
 '''
 def test2(connection):
-    best_score = 10000
-    best_melt_frac = 10
-    hf_mf_scores = np.zeros((50, 100))
-    for i in range(1,25):
-        h_frac = i * 4. / 100.
-        print("Test 2 running", round((i-1) / 24. * 100, 1), "% | h_frac = ", h_frac)
+    hf_mf_scores = np.zeros((21, 100))
+    for i in range(1,20):
+        h_frac = i * 5. / 100.
+        print("Test 2 running", round((i-1) / 19. * 100, 1), "% | h_frac = ", h_frac)
         for j in range(10, 110):
-            score = simulation(0.05, False, 0.12, j, .45, h_frac)
+            score, _ = simulation(0.05, False, 0.12, j, .55, h_frac)
             hf_mf_scores[i, j -10] = score
     connection.send(hf_mf_scores)
     return hf_mf_scores
 
+'''
+Test 3 uses changing values for the impactor core.
+'''
 def test3(connection):
     fe_per_mf_scores = np.zeros((23, 100))
-    for i in range(9, 22):
+    for i in range(12, 22):
         fe_core = i/100.
-        print("Test 3 running", round((i - 9) /12. *100, 1), "% | fe_core = ", fe_core)
+        print("Test 3 running", round((i - 12) /10. *100, 1), "% | fe_core = ", fe_core)
         for j in range(10, 110):
-            score = simulation(0.05, False, fe_core, j)
+            score, _ = simulation(0.05, False, fe_core, j)
             fe_per_mf_scores[i, j-10] = score
     connection.send(fe_per_mf_scores)
     return fe_per_mf_scores
 
+'''
+Test 4 focuses on the difference between the scores with
+or without using the iron_seg code.
+'''
 def test4(connection):
-    fe_per_score= np.zeros((23, 30, 3))
-    for i in range(9, 22):
+    fe_per_score= np.zeros((23, 50, 6))
+    for i in range(12, 22):
         fe_core = i / 100.
-        print("Test 4 running", round((i - 9) / 12. * 100, 1), "% | fe_core = ", fe_core)
-        for j in range(0, 30):
-            fe_raw = simulation(0.05, False, fe_core, j)
-            fe_seg = simulation(0.05, True, fe_core, j)
-            fe_per_score[i, j] = [fe_raw, fe_seg, fe_seg - fe_raw]
+        print("Test 4 running", round((i - 12) / 10. * 100, 1), "% | fe_core = ", fe_core)
+        for j in range(0, 50):
+            fe_raw, ox_raw = simulation(0.05, False, fe_core, j)
+            fe_seg, ox_seg = simulation(0.05, True, fe_core, j)
+            fe_per_score[i, j] = [fe_raw, fe_seg, fe_seg - fe_raw,
+                                  ox_raw, ox_seg, ox_seg - ox_raw]
     connection.send(fe_per_score)
     return fe_per_score
 
-fig, ax = plt.subplots(1,4)
-ax[0].set(ylabel="Sim Score (SOQ)")
-ax[1].set(ylabel="Sim Score (SOQ)")
-ax[2].set(ylabel="Sim Score (SOQ)")
-ax[3].set(ylabel="Diff. Scores")
+'''
+Changes Fe_ration
+'''
+def test5(connection):
+    fe_rat_score = np.zeros((66, 100, 2))
+    for i in  range(1, 13):
+        fe_ratio = i/100. * 5.
+        print("Test 5 running", round((i-1)/13. * 100, 1), "% | fe_ratio = ", fe_ratio)
+        for j in range(10, 110):
+            fe, ox = simulation(0.05, False, .12, j, fe_ratio)
+            fe_rat_score[i, j-10] = [fe, ox]
 
-ax[0].set(xlabel="Altering Nickel in Core")
-ax[1].set(xlabel="Altering h_frac")
-ax[2].set(xlabel="Altering fe prop in Core")
-ax[3].set(xlabel="Difference with Alterated - Regular")
+    connection.send(fe_rat_score)
+    return fe_rat_score
+
+
+
+
+fig, ax = plt.subplots(2,4)
+ax[0,0].set(ylabel="Sim Score")
+ax[0,1].set(ylabel="Sim Score")
+ax[0,2].set(ylabel="Sim Score")
+ax[0,3].set(ylabel="Sim Score")
+
+ax[1,0].set(ylabel="Diff. Scores")
+ax[1,1].set(ylabel="Sim Score")
+ax[1,2].set(ylabel="Diff. Scores")
+ax[1,3].set(ylabel="Oxygen Fugacity")
+
+ax[0,0].set(xlabel="Altering Nickel in Core")
+ax[0,1].set(xlabel="Altering h_frac")
+ax[0,2].set(xlabel="Altering size of core")
+ax[0,3].set(xlabel="Varying fe_ratio")
+
+ax[1,0].set(xlabel="Difference in Score (Segreg - Regular)")
+ax[1,0].set(xlabel="With and without Segregation (Score)")
+ax[1,0].set(xlabel="Difference in O_fug with Alterated - Regular")
+ax[1,0].set(xlabel="With and without Segregation (Oxygen Fug)")
 
 plt.tight_layout()
 
 if __name__ == "__main__":
 
-    test_1_data, test_1_proc = mp.Pipe()
-    test_2_data, test_2_proc = mp.Pipe()
-    test_3_data, test_3_proc = mp.Pipe()
-    test_4_data, test_4_proc = mp.Pipe()
+    testing_order = test5, test4, test1, test3, test2
+    recv_data = []
+    test_count = 0
 
-    run1 = mp.Process(target= test1, args=(test_1_proc,))
-    run2 = mp.Process(target= test2, args=(test_2_proc,))
-    run3 = mp.Process(target= test3, args=(test_3_proc,))
-    run4 = mp.Process(target= test4, args=(test_4_proc,))
+    for test in testing_order:
+        recv, comm = mp.Pipe()
+        recv_data.append(recv)
+        run = mp.Process(target= test, args=(comm,))
+        run.start()
 
-    run1.start()
-    run2.start()
-    run3.start()
-    run4.start()
-
-    data4 = test_4_data.recv()
-    print("> > > Received Test 4 results")
-    color = (220, 220, 220)
-    for i in range(9, 22):
-        (a,b,c) = color
-        color = (a-8, b -8, c-8)
-        ax[3].plot(range(0, 30),data4[i, :, 2], color=rgb_to_hex(color), linestyle="-" )
+    data5 = recv_data[test_count].recv()
+    print("> > > Received Test 5 results")
+    col = 220
+    for i in range(1, 13):
+        color = (col, col, col)
+        ax[0,3].plot(range(10, 110), data5[i, :, 0], color = rgb_to_hex(color), linestyle="-")
+        col -= 12
+    #ax[0,3].set_ylim([100, 800])
     plt.savefig("./sim.pdf")
+    test_count += 1
 
-    data1 = test_1_data.recv()
+    data4 = recv_data[test_count].recv()
+    print("> > > Received Test 4 results")
+    col = 220
+    for i in range(12, 22):
+        color = (col, col, col)
+        color1 = (0, col, 0)
+        color2 = (col, 0, 0)
+        ax[1,0].plot(range(0, 50), data4[i, :, 2], color=rgb_to_hex(color), linestyle="-" )
+        ax[1,1].plot(range(0, 50), data4[i, :, 0], color=rgb_to_hex(color1), linestyle="-")
+        ax[1,1].plot(range(0, 50), data4[i, :, 1], color=rgb_to_hex(color2), linestyle="-")
+        ax[1,2].plot(range(0, 50), data4[i, :, 5], color=rgb_to_hex(color), linestyle="-")
+        ax[1,3].plot(range(0, 50), data4[i, :, 3], color=rgb_to_hex(color1), linestyle="-")
+        ax[1,3].plot(range(0, 50), data4[i, :, 4], color=rgb_to_hex(color2), linestyle="-")
+        col -= 16
+    ax[1,1].set_ylim([100,800])
+    plt.savefig("./sim.pdf")
+    test_count += 1
+
+    data1 = recv_data[test_count].recv()
     print("> > > Received Test 1 Results")
     color = (220, 220, 220)
     for i in range(1, 10):
         (a, b, c) = color
         color = (a - 20, b - 20, c - 20)
-        ax[0].plot(range(10, 110), data1[i, :], color=rgb_to_hex(color), linestyle="-")
-    ax[0].set_ylim([300, 1200])
+        ax[0,0].plot(range(10, 110), data1[i, :], color=rgb_to_hex(color), linestyle="-")
+    ax[0,0].set_ylim([300, 1300])
     plt.savefig("./sim.pdf")
+    test_count += 1
 
-    data3 = test_3_data.recv()
+    data3 = recv_data[test_count].recv()
     print("> > > Received Test 3 Results")
     color = (220,220,220)
-    for i in range(9, 22):
+    for i in range(12, 22):
         (a, b, c) = color
         color = (a - 16, b - 16, c - 16)
-        ax[2].plot(range(10,110), data3[i,:], color=rgb_to_hex(color), linestyle="-")
-    ax[2].set_ylim([300, 1200])
+        ax[0,2].plot(range(10,110), data3[i,:], color=rgb_to_hex(color), linestyle="-")
+    ax[0,2].set_ylim([100, 1300])
     plt.savefig("./sim.pdf")
+    test_count += 1
 
-    data2 = test_2_data.recv()
+    data2 = recv_data[test_count].recv()
     print("> > > Received Test 2 Results")
-    color = (200, 200, 200)
-    for i in range(1,25):
+    color = (220, 220, 220)
+    for i in range(1,20):
         (a,b,c) = color
         color = (a - 5, b - 5, c- 5)
-        ax[1].plot(range(10, 110), data2[i, :], color=rgb_to_hex(color), linestyle="-")
-    ax[1].set_ylim([300, 1200])
+        ax[0,1].plot(range(10, 110), data2[i, :], color=rgb_to_hex(color), linestyle="-")
+    ax[0,1].set_ylim([100, 1300])
     plt.savefig("./sim.pdf")
-
-
+    test_count += 1
 
