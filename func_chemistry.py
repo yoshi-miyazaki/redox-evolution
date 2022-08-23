@@ -2,40 +2,32 @@ import numpy as np
 
 ''' element information '''
 Nmol = 11
-nO, nMg, nAl, nSi, nV, nCr, nFe, nCo, nNi, nTa, nNb = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 # nCr, nCo,
-list_major = [nMg, nAl, nSi, nFe, nNi, nCr]
-list_minor = [nV, nCo, nTa, nNb]
+nO, nMg, nAl, nSi, nV, nCr, nFe, nCo, nNi, nNb, nTa = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 
+list_major = [nMg, nAl, nSi, nFe, nNi, nCr, nCo]
+list_minor = [nV, nTa, nNb]
 
 # O, Mg, Si, V, Fe, Ni, Ta, Nb
 molar_mass = np.array([16, 24.3, 26.98, 28., 50.94, 52., 55.8, 58.9, 58.7, 47.87, 92.9])*1e-3
-molar_mass_o  = molar_mass[nO]
-molar_mass_mg = molar_mass[nMg]
-molar_mass_al = molar_mass[nAl]
-molar_mass_si = molar_mass[nSi]
-molar_mass_v  = molar_mass[nV] 
-molar_mass_fe = molar_mass[nFe]
-molar_mass_ni = molar_mass[nNi]
-molar_mass_ta = molar_mass[nTa]
-molar_mass_nb = molar_mass[nNb]
 
 def set_initial_mantle_composition_from_element(x_element):
     '''
-    set initial composition using  wt% and
+    set initial composition using wt% and
     convert it to molar amount (mole/kg of elements)
     
-    input:  wt% of elements (Mg, Al, Si, V, Cr, Fe, Co, Ni, Ta, Nb)
-    output: molar conversion of (O, Mg, Al, Si, V, Cr, Fe, Co, Ni, Ta, Nb)
+    input:  wt% of elements (Mg, Al, Si, V, Cr, Fe, Co, Ni, Nb, Ta)
+    output: molar conversion of (O, Mg, Al, Si, V, Cr, Fe, Co, Ni, Nb, Ta)
     '''
     # normalize the input to make it wt%
     tot       = np.sum(x_element)
-    r_element = x_element/tot    
+    r_element = x_element/tot
     
-    # convert wt% into mole amount (unit: mole/1 kg of oxides)
+    # convert wt% into mole amount (unit: mole/1 kg of metal elements, not inc oxygen)
     m_element = r_element/molar_mass[nMg:]
-
-    # convert oxide to element (unit: mole/1 kg of oxides)
-    m_element_wO = np.array([m_element[0] + m_element[1]*1.5 + m_element[2]*2 + m_element[3]*1.5 + m_element[4] + m_element[5]
-                             + m_element[6] + m_element[7] + m_element[8]*2.5 + m_element[9]*2.5,  
+    
+    # include oxygen, assuming all elements exist as oxides
+    m_element_wO = np.array([m_element[0]     + m_element[1]*1.5 + m_element[2]*2 + m_element[3]*1.5 +
+                             m_element[4]     + m_element[5]     + m_element[6]   + m_element[7] +
+                             m_element[8]*2.5 + m_element[9]*2.5,    # O (assuming Fe+2, Cr+2)
                              m_element[0],    # Mg
                              m_element[1],    # Al
                              m_element[2],    # Si
@@ -44,10 +36,15 @@ def set_initial_mantle_composition_from_element(x_element):
                              m_element[5],    # Fe
                              m_element[6],    # Co
                              m_element[7],    # Ni
-                             m_element[8],    # Ta
-                             m_element[9]])   # Nb
+                             m_element[8],    # Nb
+                             m_element[9]])   # Ta
+
+    # calc total mass of m_element_wO
+    MwO = mole2mass(m_element_wO)
     
-    return m_element_wO
+    # return mole amount (unit: mole/1 kg of oxides)
+    # -- divide by MwO to normalize
+    return m_element_wO/MwO
 
 def set_initial_mantle_composition(x_oxide):
     '''
@@ -71,16 +68,15 @@ def set_initial_mantle_composition(x_oxide):
                             molar_mass[nFe]  + molar_mass[nO],    # FeO
                             molar_mass[nCo]  + molar_mass[nO],    # CoO
                             molar_mass[nNi]  + molar_mass[nO],    # NiO
-                            molar_mass[nTa]  + molar_mass[nO]*2,  # TaO2
-                            molar_mass[nNb]  + molar_mass[nO]])   # NbO
+                            molar_mass[nNb]  + molar_mass[nO],    # NbO
+                            molar_mass[nTa]  + molar_mass[nO]*2]) # TaO2
 
-    
     # convert wt% into mole amount (unit: mole/1 kg of oxides)
     m_oxide     = r_oxide/molar_oxide
 
     # convert oxide to element (unit: mole/1 kg of oxides)
-    m_element   = np.array([m_oxide[0] + m_oxide[1]*3 + m_oxide[2]*2 + m_oxide[3]*3 + m_oxide[4] + m_oxide[5], #
-                            #+ m_oxide[6] + m_oxide[7],  # O
+    m_element   = np.array([m_oxide[0] + m_oxide[1]*3 + m_oxide[2]*2 + m_oxide[3]*3 + m_oxide[4] + m_oxide[5], 
+                            + m_oxide[6] + m_oxide[7],  # O
                             m_oxide[0],    # Mg
                             m_oxide[1]*2,  # Al
                             m_oxide[2],    # Si
@@ -89,8 +85,8 @@ def set_initial_mantle_composition(x_oxide):
                             m_oxide[5],    # Fe
                             m_oxide[6],    # Co
                             m_oxide[7],    # Ni
-                            m_oxide[8],    # Ta
-                            m_oxide[9]])   # Nb
+                            m_oxide[8],    # Nb
+                            m_oxide[9]])   # Ta
     
     return m_element
 
@@ -124,8 +120,8 @@ def set_initial_core_composition(x_metal):
                             m_metal[0],   # Fe
                             0.,           # Co
                             m_metal[1],   # Ni
-                            0.,           # Ta
-                            0.])          # Nb
+                            0.,           # Nb
+                            0.])          # Ta
     
     return m_element
 

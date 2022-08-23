@@ -59,10 +59,13 @@ def partition_MO_impactor(molep, T_eq, P_eq):
     '''
 
     # calc partition coefficients
-    Kd_Ni = calc_Kd("Ni", T_eq, P_eq)  # Ni
-    Kd_Si = calc_KdSi(T_eq, P_eq)
-    Kd_Cr = calc_Kd("Cr", T_eq, P_eq)
-
+    l_Kd  = np.zeros(Nmol)
+    l_Kd[nSi] = calc_KdSi(T_eq, P_eq)
+    l_Kd[nV]  = calc_Kd("V",  T_eq, P_eq)
+    l_Kd[nCr] = calc_Kd("Cr", T_eq, P_eq)
+    l_Kd[nCo] = calc_Kd("Co", T_eq, P_eq)
+    l_Kd[nNi] = calc_Kd("Ni", T_eq, P_eq)  # Ni
+    
     # determine the range
     tot_Si, tot_Fe = molep[nSi], molep[nFe]
 
@@ -70,21 +73,23 @@ def partition_MO_impactor(molep, T_eq, P_eq):
     # x0, x1 represents the mole of Fe in the metal phase
     # considering the reaction, 
     x0 = tot_Fe * 0.001
-    x1 = (tot_Fe - (molep[nO] - molep[nMg] - molep[nAl] * 1.5 - molep[nSi] * 2 - molep[nNi] - molep[nCo] - molep[nCr]))*1.
-    xL = x1*1.
-    
-    f0 = df(x0, molep, Kd_Ni, Kd_Si, Kd_Cr)
-    f1 = df(x1, molep, Kd_Ni, Kd_Si, Kd_Cr)
+    f0 = df(x0, molep, l_Kd)
 
+    xL = tot_Fe - (molep[nO]- molep[nMg]- molep[nAl]*1.5- molep[nSi]*2- molep[nV]*1.5- molep[nCr] -molep[nNi]- molep[nCo])
+    x1 = positive_Si(xL, molep, l_Kd, f0) 
+    f1 = df(x1, molep, l_Kd)
+
+    flag = 0
     if (f0 * f1 > 0):
+        flag = 1
         xA = (x0 + x1) * .5
-        fA = df(xA, molep, Kd_Ni, Kd_Si, Kd_Cr)
-        print("partition.py: bisection range error *: ", x0, x1, "\t", f0, f1, "\t", fA)
+        fA = df(xA, molep, l_Kd)
+        print("partition.py: bisection range error : ", x0, x1, xL, "\t", f0, f1, "\t", fA)
 
     eps = 1e-8
     while (np.abs(f1 - f0) > eps):
         xA = (x0 + x1) * .5
-        fA = df(xA, molep, Kd_Ni, Kd_Si, Kd_Cr)
+        fA = df(xA, molep, l_Kd)
 
         if (f0 * fA < 0):
             x1, f1 = xA, fA
@@ -92,8 +97,13 @@ def partition_MO_impactor(molep, T_eq, P_eq):
             x0, f0 = xA, fA
 
     # mole_sil, mole_met = massbalance_metFe(xA, molep, Kd_Ni, Kd_Si)
-    mole_sil, mole_met = massbalance_metFe(xA, molep, Kd_Ni, Kd_Si, Kd_Cr)
+    mole_sil, mole_met = massbalance_metFe(xA, molep, l_Kd)
 
+    if (flag):
+        xA = (x0 + x1) * .5
+        fA = df(xA, molep, l_Kd)
+        print("partition.py: bisection range error : ", x0, x1, xL, "\t", f0, f1, "\t", fA)
+    
     # restore minor elements
     for i in range(Nmol):
         if (i not in list_major):
@@ -105,7 +115,7 @@ def partition_MO_impactor(molep, T_eq, P_eq):
 
 
 # @njit
-def df(met_Fe, molep, Kd_Ni, Kd_Si, Kd_Cr):
+def df(met_Fe, molep, l_Kd):
     '''
     Returns the difference between the actual Kd(Si-Fe) and calculated value for Kd(Si-Fe). 
 
@@ -115,41 +125,26 @@ def df(met_Fe, molep, Kd_Ni, Kd_Si, Kd_Cr):
     Kd_Ni:  equilibrium constant for the Fe+NiO = Ni+FeO reaction
     '''
 
-    tot_Mg, tot_Al, tot_Si, tot_Fe, tot_Ni,  tot_Cr = molep[nMg],molep[nAl],molep[nSi],molep[nFe],molep[nNi],molep[nCr]
-    tot_O = molep[nO]
-
-    # Calculate Fe amount
-    sil_Fe = tot_Fe - met_Fe
-
-    # calc Ni amount
-    sil_Ni = tot_Ni * sil_Fe / (sil_Fe + Kd_Ni * met_Fe)
-    met_Ni = tot_Ni - sil_Ni
-
-    # calc Cr amount
-    sil_Cr = tot_Cr * sil_Fe / (sil_Fe + Kd_Cr * met_Fe)
-    met_Cr = tot_Cr - sil_Cr
-
-    # calc Si amount
-    sil_Si = (tot_O - sil_Ni - sil_Fe - tot_Mg - tot_Al * 1.5 - sil_Cr) / 2.
-    met_Si = tot_Si - sil_Si
-
-    # assume all Mg is exsits as oxides
-    sil_Mg = tot_Mg
-    sil_Al = tot_Al
+    mole_sil, mole_met = massbalance_metFe(met_Fe, molep, l_Kd)
 
     # compare with Kd_Si
-    tot_met = met_Si + met_Fe + met_Ni + met_Cr
-    tot_sil = sil_Si + sil_Fe + sil_Ni + sil_Mg + sil_Al + sil_Cr
-
+    sil_Fe  = mole_sil[nFe]
+    sil_Si  = mole_sil[nSi]
+    met_Si  = mole_met[nSi]
+    tot_met = np.sum(mole_met[nMg:])
+    tot_sil = np.sum(mole_sil[nMg:])
+    
     xSi_met = met_Si / tot_met
     xSi_sil = sil_Si / tot_sil
     xFe_met = met_Fe / tot_met
     xFe_sil = sil_Fe / tot_sil
 
+    Kd_Si = l_Kd[nSi]
+
     return xSi_met * (xFe_sil * xFe_sil) / (xFe_met * xFe_met * xSi_sil) - Kd_Si
 
 
-def massbalance_metFe(met_Fe, molep, Kd_Ni, Kd_Si, Kd_Cr):
+def massbalance_metFe(met_Fe, molep, l_Kd):
     '''
     The amoount of Fe in the metal phase is calculated in `partition_MO_impactor`.
     Based of its result, the rest of the composition is determined based on mass balance
@@ -158,38 +153,63 @@ def massbalance_metFe(met_Fe, molep, Kd_Ni, Kd_Si, Kd_Cr):
     output -- composition vector of silicate and metal phases
     '''
 
-    tot_O, tot_Mg, tot_Al = molep[nO], molep[nMg], molep[nAl]
-    tot_Si, tot_Fe, tot_Ni = molep[nSi], molep[nFe], molep[nNi]
-
-    tot_Cr = molep[nCr]
-
+    tot_O,  tot_Mg, tot_Al = molep[nO],  molep[nMg], molep[nAl]
+    tot_Si, tot_V,  tot_Cr = molep[nSi], molep[nV],  molep[nCr]
+    tot_Fe, tot_Co, tot_Ni = molep[nFe], molep[nCo], molep[nNi]
+    
     # calc Fe, Ni amount 
     sil_Fe = tot_Fe - met_Fe
-    sil_Ni = tot_Ni * sil_Fe / (sil_Fe + Kd_Ni * met_Fe)
+    sil_Ni = tot_Ni * sil_Fe / (sil_Fe + l_Kd[nNi] * met_Fe)
     met_Ni = tot_Ni - sil_Ni
 
+    # calc V amount
+    sil_V  = tot_V  * sil_Fe / (sil_Fe + l_Kd[nV] * met_Fe)
+    met_V  = tot_V  - sil_V
+
     # calc Cr amount
-    sil_Cr = tot_Cr * sil_Fe / (sil_Fe + Kd_Cr * met_Fe)
+    sil_Cr = tot_Cr * sil_Fe / (sil_Fe + l_Kd[nCr] * met_Fe)
     met_Cr = tot_Cr - sil_Cr
 
+    # calc Co amount
+    sil_Co = tot_Co * sil_Fe / (sil_Fe + l_Kd[nCo] * met_Fe)
+    met_Co = tot_Co - sil_Co
+    
     # calc Si amount
-    sil_Si = (tot_O - sil_Ni - sil_Fe - tot_Mg - tot_Al * 1.5 - sil_Cr) / 2.
+    sil_Si = (tot_O - tot_Mg - tot_Al*1.5 - sil_V*1.5 - sil_Cr - sil_Fe - sil_Co - sil_Ni) / 2.
     met_Si = tot_Si - sil_Si
 
     # store results
     mole_sil = np.zeros(Nmol)
     mole_met = np.zeros(Nmol)
 
-    mole_sil[nSi], mole_sil[nFe], mole_sil[nNi], mole_sil[nCr] = sil_Si, sil_Fe, sil_Ni, sil_Cr
-    mole_met[nSi], mole_met[nFe], mole_met[nNi], mole_met[nCr] = met_Si, met_Fe, met_Ni, met_Cr
+    mole_sil[nSi],mole_sil[nV],mole_sil[nCr],mole_sil[nFe],mole_sil[nCo],mole_sil[nNi] = sil_Si,sil_V,sil_Cr,sil_Fe,sil_Co,sil_Ni
+    mole_met[nSi],mole_met[nV],mole_met[nCr],mole_met[nFe],mole_met[nCo],mole_met[nNi] = met_Si,met_V,met_Cr,met_Fe,met_Co,met_Ni
 
     # assume all Mg is exsits as oxides
-    mole_sil[nMg] = molep[nMg]
-    mole_sil[nAl] = molep[nAl]
-    mole_sil[nO] = molep[nO]
+    mole_sil[nO],mole_sil[nMg],mole_sil[nAl] = molep[nO],molep[nMg],molep[nAl]
 
     return mole_sil, mole_met
 
+
+def positive_Si(met_Fe, molep, l_Kd, f0):
+
+    mole_sil, mole_met = massbalance_metFe(met_Fe, molep, l_Kd)
+    f1 = df(met_Fe, molep, l_Kd)
+    
+    new_met_Fe = met_Fe
+    while (f0*f1>0):
+        new_met_Fe *= 0.999
+        mole_sil, mole_met = massbalance_metFe(new_met_Fe, molep, l_Kd)
+        f1 = df(new_met_Fe, molep, l_Kd)
+
+        if (new_met_Fe/molep[nFe] < 1e-5):
+            print("func_partition.py - positive_Si: met_Fe too small", new_met_Fe, "/", molep[nFe])
+            exit()
+
+        #print(new_met_Fe, "/", molep[nFe], "\t", f0, f1, "\t", mole_met[nSi])
+        
+    return new_met_Fe
+    
 
 # @njit
 def partition_minor(n_sil, n_met, T_eq, P_eq):
@@ -207,7 +227,6 @@ def partition_minor(n_sil, n_met, T_eq, P_eq):
     Kd_Co = calc_Kd("Co", T_eq, P_eq)
     Kd_Ta = calc_Kd("Ta", T_eq, P_eq)
     Kd_Nb = calc_Kd("Nb", T_eq, P_eq)
-
     
     # calc total amount of major elements in silicate/metal phases
     #

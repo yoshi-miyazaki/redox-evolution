@@ -28,9 +28,9 @@ The magma ocean covers the "metal pond" before the next impactor arrives.
 rpl     = 1000e3   # initial embryo size (radius in m)
 f_core  = 0.12     # fraction of core mass
 
-melt_factor = 24.  # melt volume produced upon impact = melt_factor * vol_impactor
+melt_factor = 48.  # melt volume produced upon impact = melt_factor * vol_impactor
 
-fe_ratio = 0.45    # ration of metal iron to total iron
+fe_ratio = 0.55    # ration of metal iron to total iron
 
 ''' composition '''
 # calc Fe wt% in the core/mantle based on the init conditions by Rubie et al. (2015)
@@ -38,9 +38,9 @@ fe_mantle, fe_core = chem_mass_fe(f_core, fe_ratio, 0.1866)
 ni_mantle, ni_core = chem_mass_ni(0.05, f_core, 0.01091)
 
 # set initial composition in wt% 
-# (in the order of MgO, Al2O3, SiO2, V2O3, CrO, FeO, CoO, NiO, TaO2, NbO)
+# (in the order of MgO, Al2O3, SiO2, V2O3, CrO, FeO, CoO, NiO, NbO, TaO2)
 # -> and convert to molar
-xinit_mantle     = np.array([0.0954e2, 0.0102e2, 0.1070e2, 60.6e-4, 2623e-4, fe_mantle, 0.000513e2, ni_mantle, 18.3e-7, 345e-7])
+xinit_mantle     = np.array([0.0954e2, 0.0102e2, 0.1070e2, 60.6e-4, 2623e-4, fe_mantle, 0.000513e2, ni_mantle, 345e-7, 18.3e-7])
 # xinit_mantle     = np.array([36., 4., 49., 0.00606, 0.2623, 7., 0.0513,  0., 6.6e-6, 8.55e-5])
 
 # set core composition in wt%
@@ -70,7 +70,6 @@ print("Fe in metal: ", n_core[nFe]/(n_mantle[nFe]+n_core[nFe]))
 l_rpl, l_dm, l_Peq, l_Teq, l_DSi, l_fO2 = np.array([]), np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
 l_sil, l_met = n_mantle, n_core
 l_Mm,  l_Mc  = M_mantle, M_core
-
 
 ''' solve for growth '''
 # -- growing the planetesimal to a planetary embryo
@@ -143,7 +142,8 @@ while (1):
     n_sil, n_met = partition_minor(n_sil, n_met, T_eq, P_eq)
 
     # solve for the segregation between FeO
-    #n_sil, n_met = seg_fe_phase(n_met,n_sil, T_eq, P_eq)
+    for i in range(1):
+        n_sil, n_met = seg_fe_phase(n_met,n_sil, T_eq, P_eq)
     
     #print("Impact: ", n_sil_new[nFe] - n_sil[nFe], n_new_met[nFe] - n_met[nFe])
 
@@ -157,7 +157,8 @@ while (1):
     xFeO  = n_sil[nFe]/np.sum(n_sil[nMg:])
     xSiO2 = n_sil[nSi]/np.sum(n_sil[nMg:])
     
-    print(count, "\t Fe ratio: ", n_met[nFe]/n_delivered[nFe], "\t Si: ", n_met[nSi]/n_delivered[nSi], " \t org: " , n_MO[nFe]/n_MO[nSi], "\t", calc_KdSi(T_eq, P_eq), "  calc:", xSi*xFeO*xFeO/xSiO2/xFe/xFe)
+    d_mantle = mass2shell_width(M_mantle, rhom, rc)
+    print(count, "\t Fe ratio: ", xFe, "\t Si: ", n_met[nSi]/n_delivered[nSi], " \t org: " , n_met[nFe]/n_partition[nFe], "\t", calc_KdSi(T_eq, P_eq), "\t", P_eq, Peq(g_acc, d_mantle), " GPa") # "  calc:", xSi*xFeO*xFeO/xSiO2/xFe/xFe)
         
     
     ''' atmosphere interaction '''
@@ -227,14 +228,12 @@ ax[1].set_ylim([0,60])
 
 # minor element abundance
 ax[2].set(ylabel="Mantle abundance [ppm]")
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nV ]*1e6 -  113, color="k", linestyle="-")  # V ppm in the mantle  (pattern, third value)
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nNi]*1e6 - 3000, color="r", linestyle="-")  # Ni pp? in the mantle (matches, pattern)
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nCo]*1e6 -  200, color="b", linestyle=":")  # Co pp? in the mantle (close match, pattern)
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nCr]*1e6 - 4500, color="g", linestyle=":")  # Cr pp? in the mantle (pattern, half value)
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nTa]*1e9 -   36, color="b", linestyle="-")  # Ta ppb in the mantle (forced match, pattern)
-ax[2].plot(l_rpl/1e3, wt_mantle[:,nNb]*1e9 -  675, color="g", linestyle="-")  # Nb ppm in the mantle (forced match, pattern)
-
-ax[2].set_ylim([-200,200])
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nV ]*1e6 -  113*0, color="k", linestyle="-")  # V ppm in the mantle  (pattern, third value)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nNi]*1e6 - 3000*0, color="r", linestyle="-")  # Ni pp? in the mantle (matches, pattern)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nCo]*1e6 -  200*0, color="b", linestyle=":")  # Co pp? in the mantle (close match, pattern)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nCr]*1e6 - 4500*0, color="g", linestyle=":")  # Cr pp? in the mantle (pattern, half value)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nTa]*1e9 -   36*0, color="b", linestyle="-")  # Ta ppb in the mantle (forced match, pattern)
+ax[2].plot(l_rpl/1e3, wt_mantle[:,nNb]*1e9 -  675*0, color="g", linestyle="-")  # Nb ppm in the mantle (forced match, pattern)
 
 sum_of_squares = ((wt_mantle[-1:, nV ] - 113e-6)**2 / 113e-6) +\
                  ((wt_mantle[-1:, nNi] - 3000e-6)**2 / 3000e-6) +\
